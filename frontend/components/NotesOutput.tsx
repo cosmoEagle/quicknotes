@@ -11,9 +11,16 @@ interface Props {
   isError: boolean;
   style: string;
   cards: Card[];
+  isEditing: boolean;
+  onToggleEdit: () => void;
+  onNotesChange: (s: string) => void;
+  onCardEdit: (index: number, field: "question" | "answer", value: string) => void;
 }
 
-export default function NotesOutput({ notes, status, isStreaming, isError, style, cards }: Props) {
+export default function NotesOutput({
+  notes, status, isStreaming, isError, style, cards,
+  isEditing, onToggleEdit, onNotesChange, onCardEdit,
+}: Props) {
   const hasContent = notes.length > 0;
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -26,7 +33,16 @@ export default function NotesOutput({ notes, status, isStreaming, isError, style
 
   // Flashcard mode owns its own panel (error still takes precedence).
   if (style === "flashcard" && !isError) {
-    return <FlashcardViewer cards={cards} isStreaming={isStreaming} status={status} />;
+    return (
+      <FlashcardViewer
+        cards={cards}
+        isStreaming={isStreaming}
+        status={status}
+        isEditing={isEditing}
+        onToggleEdit={onToggleEdit}
+        onCardEdit={onCardEdit}
+      />
+    );
   }
 
   const handleDownload = () => {
@@ -91,6 +107,18 @@ export default function NotesOutput({ notes, status, isStreaming, isError, style
 
         {hasContent && !isStreaming && !isError && (
           <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              onClick={onToggleEdit}
+              style={{
+                padding: "5px 14px", borderRadius: "8px", fontSize: "11px",
+                fontFamily: "var(--font-dm-sans)", cursor: "pointer",
+                border: isEditing ? "1px solid var(--accent-border)" : "1px solid var(--border)",
+                color: isEditing ? "var(--accent)" : "var(--text-secondary)",
+                background: isEditing ? "var(--accent-faint)" : "transparent", transition: "all 150ms",
+              }}
+            >
+              {isEditing ? "✓ done" : "✎ edit"}
+            </button>
             <button
               onClick={handleCopy}
               style={{
@@ -177,8 +205,22 @@ export default function NotesOutput({ notes, status, isStreaming, isError, style
           </pre>
         )}
 
+        {/* Manual edit: raw textarea bound to notes */}
+        {hasContent && !isError && !isStreaming && isEditing && (
+          <textarea
+            value={notes}
+            onChange={(e) => onNotesChange(e.target.value)}
+            spellCheck={false}
+            style={{
+              width: "100%", minHeight: "100%", resize: "none",
+              fontFamily: "var(--font-jetbrains), monospace", fontSize: "12.5px", lineHeight: 1.7,
+              background: "transparent", border: "none", outline: "none", color: "var(--text-primary)",
+            }}
+          />
+        )}
+
         {/* Done: full markdown rendering */}
-        {hasContent && !isError && !isStreaming && (
+        {hasContent && !isError && !isStreaming && !isEditing && (
           <div className="md-output">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{notes}</ReactMarkdown>
           </div>

@@ -7,9 +7,10 @@ import SourceTabs, { SourceType } from "@/components/SourceTabs";
 import NoteStylePicker, { NoteStyle, Proficiency } from "@/components/NoteStylePicker";
 import { Card } from "@/components/FlashcardViewer";
 import NotesOutput from "@/components/NotesOutput";
+import ReviseChat, { ChatTurn } from "@/components/ReviseChat";
 import GenerateButton, { GenerateState } from "@/components/GenerateButton";
 import { useProviderConfig } from "@/hooks/useProviderConfig";
-import { generateNotes } from "@/lib/api";
+import { generateNotes, reviseNotes } from "@/lib/api";
 
 type Mode = "centered" | "split";
 
@@ -167,7 +168,13 @@ export default function AppPage() {
   const [status, setStatus] = useState("");
   const [genState, setGenState] = useState<GenerateState>("idle");
   const [isError, setIsError] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [chatHistory, setChatHistory] = useState<ChatTurn[]>([]);
+  const [isRevising, setIsRevising] = useState(false);
+  const [reviseStatus, setReviseStatus] = useState("");
+  const [chatCollapsed, setChatCollapsed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const reviseAbortRef = useRef<AbortController | null>(null);
 
   const canGenerate =
     loaded &&
@@ -179,10 +186,13 @@ export default function AppPage() {
   const handleGenerate = useCallback(async () => {
     if (!canGenerate) return;
     setMode("split");
+    reviseAbortRef.current?.abort();
     abortRef.current = new AbortController();
     setNotes("");
     setCards([]);
     setIsError(false);
+    setIsEditing(false);
+    setChatHistory([]);
     setStatus("Starting…");
     setGenState("extracting");
 
@@ -244,13 +254,72 @@ export default function AppPage() {
 
   const handleNew = () => {
     abortRef.current?.abort();
+    reviseAbortRef.current?.abort();
     setMode("centered");
     setNotes("");
     setCards([]);
     setGenState("idle");
     setStatus("");
     setIsError(false);
+    setIsEditing(false);
+    setChatHistory([]);
+    setIsRevising(false);
   };
+
+  const handleToggleEdit = () => setIsEditing((v) => !v);
+
+  const handleNotesChange = (s: string) => setNotes(s);
+
+  const handleCardEdit = (index: number, field: "question" | "answer", value: string) => {
+    setCards((prev) => prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)));
+  };
+
+  const handleRevise = useCallback(async (instruction: string) => {
+    if (isRevising || !notes.trim()) return;
+    reviseAbortRef.current = new AbortController();
+    const signal = reviseAbortRef.current.signal;
+    setChatHistory((prev) => [...prev, { role: "user", text: instruction }]);
+    setIsRevising(true);
+    setReviseStatus("Revising…");
+    try {
+      const stream = reviseNotes(
+        {
+          notes, instruction, history: chatHistory,
+          source_type: sourceType, content: content.trim(),
+          provider: config.provider, model: config.model, api_key: config.apiKey,
+        },
+        signal
+      );
+      for await (const msg of stream) {
+        if (signal.aborted) return;
+        if (msg.event === "status") {
+          setReviseStatus(msg.data);
+        } else if (msg.event === "summary") {
+          setChatHistory((prev) => [...prev, { role: "assistant", text: msg.data }]);
+        } else if (msg.event === "revised") {
+          setNotes(msg.data);
+        } else if (msg.event === "error") {
+          setChatHistory((prev) => [...prev, { role: "assistant", text: `⚠ ${msg.data}` }]);
+          setIsRevising(false);
+          setReviseStatus("");
+          return;
+        } else if (msg.event === "done") {
+          setIsRevising(false);
+          setReviseStatus("");
+          return;
+        }
+      }
+      setIsRevising(false);
+      setReviseStatus("");
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
+      setChatHistory((prev) => [...prev, { role: "assistant", text: `⚠ ${err instanceof Error ? err.message : "Revision failed."}` }]);
+      setIsRevising(false);
+      setReviseStatus("");
+    }
+  }, [isRevising, notes, chatHistory, sourceType, content, config]);
 
   const handleSourceTypeChange = (t: SourceType) => {
     setSourceType(t);
@@ -418,14 +487,30 @@ export default function AppPage() {
             minHeight: 0,
             overflow: "hidden",
           }}>
-            <NotesOutput
-              notes={notes}
-              status={status}
-              isStreaming={genState === "extracting" || genState === "generating"}
-              isError={isError}
-              style={style}
-              cards={cards}
-            />
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              <NotesOutput
+                notes={notes}
+                status={status}
+                isStreaming={genState === "extracting" || genState === "generating"}
+                isError={isError}
+                style={style}
+                cards={cards}
+                isEditing={isEditing}
+                onToggleEdit={handleToggleEdit}
+                onNotesChange={handleNotesChange}
+                onCardEdit={handleCardEdit}
+              />
+            </div>
+            {style !== "flashcard" && genState === "done" && !isError && (
+              <ReviseChat
+                history={chatHistory}
+                isRevising={isRevising}
+                status={reviseStatus}
+                collapsed={chatCollapsed}
+                onToggleCollapse={() => setChatCollapsed((v) => !v)}
+                onSend={handleRevise}
+              />
+            )}
           </div>
         </div>
       </div>

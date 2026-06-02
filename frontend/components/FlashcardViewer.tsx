@@ -11,6 +11,9 @@ interface Props {
   cards: Card[];
   isStreaming: boolean;
   status: string;
+  isEditing?: boolean;
+  onToggleEdit?: () => void;
+  onCardEdit?: (index: number, field: "question" | "answer", value: string) => void;
 }
 
 const TYPE_STYLES: Record<string, { bg: string; color: string; border: string }> = {
@@ -35,7 +38,7 @@ export function buildAnkiTxt(cards: Card[]): string {
   return `${header}\n${rows.join("\n")}\n`;
 }
 
-export default function FlashcardViewer({ cards, isStreaming, status }: Props) {
+export default function FlashcardViewer({ cards, isStreaming, status, isEditing = false, onToggleEdit, onCardEdit }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const prevLen = useRef(0);
@@ -131,6 +134,19 @@ export default function FlashcardViewer({ cards, isStreaming, status }: Props) {
           </span>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
+          {onToggleEdit && (
+            <button
+              onClick={onToggleEdit}
+              style={{
+                ...btnSm,
+                border: isEditing ? "1px solid var(--accent-border)" : "1px solid var(--border)",
+                color: isEditing ? "var(--accent)" : "var(--text-secondary)",
+                background: isEditing ? "var(--accent-faint)" : "transparent",
+              }}
+            >
+              {isEditing ? "✓ done" : "✎ edit"}
+            </button>
+          )}
           <button onClick={selectAll} style={btnSm}>select all</button>
           <button onClick={deselectAll} style={btnSm}>deselect all</button>
           <button onClick={handleCopy} style={btnSm}>⎘ copy</button>
@@ -145,10 +161,10 @@ export default function FlashcardViewer({ cards, isStreaming, status }: Props) {
           return (
             <div
               key={i}
-              onClick={() => toggle(i)}
+              onClick={() => { if (!isEditing) toggle(i); }}
               style={{
                 display: "flex", alignItems: "flex-start", gap: "12px",
-                padding: "12px 14px", borderRadius: "10px", cursor: "pointer",
+                padding: "12px 14px", borderRadius: "10px", cursor: isEditing ? "default" : "pointer",
                 border: isSel ? "1px solid var(--accent-border)" : "1px solid transparent",
                 background: isSel ? "var(--accent-faint)" : "transparent",
                 transition: "all 120ms",
@@ -171,12 +187,43 @@ export default function FlashcardViewer({ cards, isStreaming, status }: Props) {
                 }}>
                   {card.type}
                 </span>
-                <div style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-primary)", marginBottom: "4px", lineHeight: 1.5 }}>
-                  {card.question}
-                </div>
-                <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.6, fontFamily: "var(--font-jetbrains)" }}>
-                  {card.answer}
-                </div>
+                {isEditing ? (
+                  <>
+                    <textarea
+                      value={card.question}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => onCardEdit?.(i, "question", e.target.value)}
+                      spellCheck={false}
+                      style={{
+                        width: "100%", resize: "vertical", minHeight: "38px", marginBottom: "6px",
+                        fontFamily: "var(--font-dm-sans)", fontSize: "12px", fontWeight: 500, lineHeight: 1.5,
+                        background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "6px",
+                        color: "var(--text-primary)", outline: "none", padding: "6px 8px",
+                      }}
+                    />
+                    <textarea
+                      value={card.answer}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => onCardEdit?.(i, "answer", e.target.value)}
+                      spellCheck={false}
+                      style={{
+                        width: "100%", resize: "vertical", minHeight: "44px",
+                        fontFamily: "var(--font-jetbrains)", fontSize: "11px", lineHeight: 1.6,
+                        background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: "6px",
+                        color: "var(--text-secondary)", outline: "none", padding: "6px 8px",
+                      }}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-primary)", marginBottom: "4px", lineHeight: 1.5 }}>
+                      {card.question}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.6, fontFamily: "var(--font-jetbrains)" }}>
+                      {card.answer}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           );
