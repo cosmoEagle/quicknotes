@@ -67,3 +67,40 @@ def test_split_empty_summary_defaults():
     summary, notes = split_summary_and_notes(text)
     assert summary == "Updated the notes."
     assert notes == "real notes"
+
+
+from backend.prompts.templates import build_revise_prompt
+from backend.graph.revise import split_summary_and_notes as _split
+
+
+def test_revise_prompt_includes_notes_and_instruction():
+    p = build_revise_prompt("# My Notes\n- point", "make it shorter", [])
+    assert "# My Notes" in p
+    assert "make it shorter" in p
+    assert "consult_source" in p
+    assert "<<SUMMARY>>" in p and "<<NOTES>>" in p
+
+
+def test_revise_prompt_renders_history():
+    history = [{"role": "user", "text": "add a TL;DR"}, {"role": "assistant", "text": "Added a TL;DR."}]
+    p = build_revise_prompt("notes", "now shorten it", history)
+    assert "add a TL;DR" in p
+    assert "Added a TL;DR." in p
+
+
+def test_revise_prompt_no_history_block_when_empty():
+    p = build_revise_prompt("notes", "change", [])
+    assert "Conversation so far" not in p
+
+
+def test_revise_prompt_caps_long_notes():
+    huge = "x " * 50_000
+    p = build_revise_prompt(huge, "shorten", [])
+    assert len(p) < 70_000
+
+
+def test_revise_prompt_format_roundtrips_with_splitter():
+    sample = "<<SUMMARY>>\nDid the thing.\n<<NOTES>>\n# Revised\n- a"
+    summary, notes = _split(sample)
+    assert summary == "Did the thing."
+    assert notes == "# Revised\n- a"

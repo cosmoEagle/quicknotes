@@ -137,3 +137,37 @@ def build_flashcard_prompt(content: str, proficiency: str, card_count: int, desc
         description_clause=description_clause,
         content=content[:60_000],  # safety cap, matches build_agent_prompt
     )
+
+
+REVISE_PROMPT_TEMPLATE = """You are an expert editor refining a user's study notes. Apply the user's requested change and return the COMPLETE revised notes.
+
+You have a tool, consult_source, that searches the ORIGINAL source material the notes were made from. Use it ONLY when the requested change needs facts that are not already present in the current notes. For changes to wording, structure, length, ordering, or formatting, edit the notes directly without the tool.
+
+{history_block}Current notes:
+---
+{notes}
+---
+
+The user's requested change: {instruction}
+
+Output format — follow EXACTLY, with no text before or after:
+<<SUMMARY>>
+A single line describing what you changed.
+<<NOTES>>
+The complete revised notes in Markdown (the full document, not a diff)."""
+
+
+def build_revise_prompt(notes: str, instruction: str, history: list[dict]) -> str:
+    if history:
+        rendered = []
+        for turn in history:
+            who = "User" if turn.get("role") == "user" else "Editor"
+            rendered.append(f"{who}: {turn.get('text', '')}")
+        history_block = "Conversation so far:\n" + "\n".join(rendered) + "\n\n"
+    else:
+        history_block = ""
+    return REVISE_PROMPT_TEMPLATE.format(
+        history_block=history_block,
+        notes=notes[:60_000],
+        instruction=instruction,
+    )
