@@ -44,7 +44,7 @@ async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]
             result = await agent.ainvoke({
                 "messages": [
                     SystemMessage(content=system_prompt),
-                    HumanMessage(content=request.instruction),
+                    HumanMessage(content="Apply the requested change and return the revised notes in the required format."),
                 ]
             })
     except TimeoutError:
