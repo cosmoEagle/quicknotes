@@ -174,6 +174,7 @@ export default function AppPage() {
   const [reviseStatus, setReviseStatus] = useState("");
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const reviseAbortRef = useRef<AbortController | null>(null);
 
   const canGenerate =
     loaded &&
@@ -185,6 +186,7 @@ export default function AppPage() {
   const handleGenerate = useCallback(async () => {
     if (!canGenerate) return;
     setMode("split");
+    reviseAbortRef.current?.abort();
     abortRef.current = new AbortController();
     setNotes("");
     setCards([]);
@@ -252,6 +254,7 @@ export default function AppPage() {
 
   const handleNew = () => {
     abortRef.current?.abort();
+    reviseAbortRef.current?.abort();
     setMode("centered");
     setNotes("");
     setCards([]);
@@ -273,6 +276,8 @@ export default function AppPage() {
 
   const handleRevise = useCallback(async (instruction: string) => {
     if (isRevising || !notes.trim()) return;
+    reviseAbortRef.current = new AbortController();
+    const signal = reviseAbortRef.current.signal;
     setChatHistory((prev) => [...prev, { role: "user", text: instruction }]);
     setIsRevising(true);
     setReviseStatus("Revising…");
@@ -282,9 +287,11 @@ export default function AppPage() {
           notes, instruction, history: chatHistory,
           source_type: sourceType, content: content.trim(),
           provider: config.provider, model: config.model, api_key: config.apiKey,
-        }
+        },
+        signal
       );
       for await (const msg of stream) {
+        if (signal.aborted) return;
         if (msg.event === "status") {
           setReviseStatus(msg.data);
         } else if (msg.event === "summary") {
@@ -305,6 +312,9 @@ export default function AppPage() {
       setIsRevising(false);
       setReviseStatus("");
     } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
       setChatHistory((prev) => [...prev, { role: "assistant", text: `⚠ ${err instanceof Error ? err.message : "Revision failed."}` }]);
       setIsRevising(false);
       setReviseStatus("");
