@@ -1,9 +1,9 @@
 import asyncio
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Literal
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.prebuilt import create_react_agent
@@ -16,12 +16,12 @@ router = APIRouter()
 
 
 class ReviseRequest(BaseModel):
-    notes: str
-    instruction: str
+    notes: str = Field(max_length=500_000)
+    instruction: str = Field(max_length=5_000)
     history: list[dict] = []
-    source_type: str
+    source_type: Literal["youtube", "pdf", "article"]
     content: str
-    provider: str
+    provider: Literal["openai", "anthropic", "google_genai", "groq"]
     model: str
     api_key: str
 

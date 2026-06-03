@@ -114,10 +114,16 @@ export default function FloatingYouTubePlayer({ videoId, seekTo, onClose }: Prop
         s.src = "https://www.youtube.com/iframe_api";
         document.head.appendChild(s);
       }
-      const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => { prev?.(); init(); };
+      window.onYouTubeIframeAPIReady = init;
     }
-    return () => { playerRef.current?.destroy?.(); playerRef.current = null; };
+    return () => {
+      playerRef.current?.destroy?.();
+      playerRef.current = null;
+      // Clear stale init callback to prevent it firing on a now-unmounted component
+      if (window.onYouTubeIframeAPIReady === init) {
+        window.onYouTubeIframeAPIReady = () => {};
+      }
+    };
   }, [videoId]);
 
   // Seek when requested. seekTo.id increments on every click (even same timestamp)

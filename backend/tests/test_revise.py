@@ -106,10 +106,12 @@ def test_revise_prompt_format_roundtrips_with_splitter():
     assert notes == "# Revised\n- a"
 
 
+import pytest
 import backend.graph.revise as revise_mod
 
 
-def test_consult_source_extracts_once_and_searches(monkeypatch):
+@pytest.mark.asyncio
+async def test_consult_source_extracts_once_and_searches(monkeypatch):
     calls = {"n": 0}
 
     def fake_loader(url):
@@ -118,18 +120,19 @@ def test_consult_source_extracts_once_and_searches(monkeypatch):
 
     monkeypatch.setattr(revise_mod, "load_article", fake_loader)
     tool = revise_mod.make_consult_source("article", "http://example.com")
-    out1 = tool.invoke({"query": "beta"})
-    out2 = tool.invoke({"query": "gamma"})
+    out1 = await tool.ainvoke({"query": "beta"})
+    out2 = await tool.ainvoke({"query": "gamma"})
     assert "beta line" in out1
     assert "gamma line" in out2
     assert calls["n"] == 1  # extracted once, then cached
 
 
-def test_consult_source_handles_extraction_failure(monkeypatch):
+@pytest.mark.asyncio
+async def test_consult_source_handles_extraction_failure(monkeypatch):
     def boom(url):
         raise RuntimeError("no network")
 
     monkeypatch.setattr(revise_mod, "load_article", boom)
     tool = revise_mod.make_consult_source("article", "http://example.com")
-    out = tool.invoke({"query": "anything"})
+    out = await tool.ainvoke({"query": "anything"})
     assert "could not be retrieved" in out

@@ -239,6 +239,7 @@ export default function AppPage() {
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const reviseAbortRef = useRef<AbortController | null>(null);
+  const saveRequestedRef = useRef(false);
 
   const canGenerate =
     loaded &&
@@ -291,6 +292,7 @@ export default function AppPage() {
           setStatus("");
           return;
         } else if (msg.event === "done") {
+          saveRequestedRef.current = true;
           setGenState("done");
           setStatus("");
           return;
@@ -328,11 +330,16 @@ export default function AppPage() {
     setIsEditing(false);
     setChatHistory([]);
     setIsRevising(false);
+    saveRequestedRef.current = false;
   };
 
-  // Auto-save after generation completes
+  // Auto-save after generation completes.
+  // saveRequestedRef is set ONLY by the "done" SSE event in handleGenerate,
+  // preventing spurious saves when handleLoadNote also sets genState="done".
   useEffect(() => {
+    if (!saveRequestedRef.current) return;
     if (genState !== "done" || isError || (!notes && !cards.length)) return;
+    saveRequestedRef.current = false; // consume the flag
     const title = extractTitle(notes, cards.length ? cards : null, style, sourceType, content);
     saveNote({
       title,
@@ -349,6 +356,7 @@ export default function AppPage() {
 
   // Load a note from history
   const handleLoadNote = (note: NoteRecord) => {
+    saveRequestedRef.current = false;
     abortRef.current?.abort();
     reviseAbortRef.current?.abort();
     setMode("split");

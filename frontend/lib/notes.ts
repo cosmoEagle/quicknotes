@@ -32,7 +32,7 @@ export function extractTitle(
 
   // Find the first heading that isn't a generic structural label
   for (const m of notes.matchAll(/^#{1,3}\s+(.+)$/gm)) {
-    const clean = m[1].replace(/[*_`[\]]/g, "").replace(/^\d{2}:\d{2}\s*/, "").trim();
+    const clean = m[1].replace(/[*_`[\]]/g, "").replace(/^\d{1,2}:\d{2}(:\d{2})?\s*/, "").trim();
     if (clean.length > 3 && !SKIP_HEADINGS.test(clean)) {
       return clean.slice(0, 80);
     }
@@ -85,14 +85,16 @@ export async function loadNotes(): Promise<NoteRecord[]> {
     .from("notes")
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(100);
   if (error) throw error;
   return data ?? [];
 }
 
 export async function deleteNote(id: string): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("notes").delete().eq("id", id);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { error } = await supabase.from("notes").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw error;
 }
 
@@ -101,6 +103,8 @@ export async function updateNoteContent(
   updates: Partial<Pick<NoteRecord, "content" | "cards" | "title">>
 ): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("notes").update(updates).eq("id", id);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { error } = await supabase.from("notes").update(updates).eq("id", id).eq("user_id", user.id);
   if (error) throw error;
 }

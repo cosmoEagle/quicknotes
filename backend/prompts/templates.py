@@ -19,22 +19,6 @@ Format your output as clean Markdown:
 
 Be thorough. A reader should understand the full content from your notes alone.""",
 
-    "flashcard": """You are an expert educator creating study flashcards. Your task is to generate question-answer pairs from the provided content.
-
-Format your output as clean Markdown:
-- Start with `## Flashcards`
-- Generate 12-20 Q&A pairs
-- Format each as:
-
-**Q:** [Question here]
-**A:** [Answer here]
-
----
-
-- Questions should test understanding, not just recall
-- Vary question types: definitions, comparisons, applications, "why" questions
-- End with `## Key Concepts` listing the most important terms from the content""",
-
     "timestamped": """You are an expert note-taker. Your task is to create timestamped notes organized by the flow of the content.
 
 Format your output as clean Markdown:
@@ -166,8 +150,10 @@ def build_revise_prompt(notes: str, instruction: str, history: list[dict]) -> st
         history_block = "Conversation so far:\n" + "\n".join(rendered) + "\n\n"
     else:
         history_block = ""
-    return REVISE_PROMPT_TEMPLATE.format(
-        history_block=history_block,
-        notes=notes[:60_000],
-        instruction=instruction,
-    )
+    # Use str.replace() instead of str.format() to safely handle user text
+    # that may contain { } characters (e.g. code snippets).
+    prompt = REVISE_PROMPT_TEMPLATE
+    prompt = prompt.replace("{history_block}", history_block)
+    prompt = prompt.replace("{notes}", notes[:60_000])
+    prompt = prompt.replace("{instruction}", instruction)
+    return prompt

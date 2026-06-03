@@ -1,9 +1,12 @@
+import asyncio
+
 from langchain_core.tools import tool
 
 from ..loaders.youtube import load_youtube
 from ..loaders.pdf import load_pdf
 from ..loaders.article import load_article
 from .tools import search_text
+from ..utils.url_validation import validate_url
 
 SUMMARY_MARK = "<<SUMMARY>>"
 NOTES_MARK = "<<NOTES>>"
@@ -46,19 +49,23 @@ def make_consult_source(source_type: str, content: str):
     Extraction runs at most once (cached). On extraction failure the tool returns
     a benign message so the agent proceeds from the current notes alone.
     """
-    cache = {"text": None, "loaded": False}
+    cache: dict = {"text": None, "loaded": False}
 
-    def _ensure_text() -> str:
+    async def _ensure_text() -> str:
         if cache["loaded"]:
             return cache["text"] or ""
         cache["loaded"] = True
         try:
             if source_type == "youtube":
-                cache["text"] = load_youtube(content)["text"]
+                result = await asyncio.to_thread(load_youtube, content)
+                cache["text"] = result["text"]
             elif source_type == "pdf":
-                cache["text"] = load_pdf(content)["text"]
+                result = await asyncio.to_thread(load_pdf, content)
+                cache["text"] = result["text"]
             elif source_type == "article":
-                cache["text"] = load_article(content)["text"]
+                validate_url(content)
+                result = await asyncio.to_thread(load_article, content)
+                cache["text"] = result["text"]
             else:
                 cache["text"] = ""
         except Exception:
@@ -66,9 +73,9 @@ def make_consult_source(source_type: str, content: str):
         return cache["text"] or ""
 
     @tool
-    def consult_source(query: str) -> str:
+    async def consult_source(query: str) -> str:
         """Search the ORIGINAL source material for facts that are not already in the current notes. Use this ONLY when the requested change needs information beyond what the notes contain."""
-        text = _ensure_text()
+        text = await _ensure_text()
         if not text:
             return "The original source could not be retrieved; work from the current notes only."
         return search_text(text, query)

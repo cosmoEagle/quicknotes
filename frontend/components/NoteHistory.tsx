@@ -22,9 +22,17 @@ export default function NoteHistory({ open, onClose, onLoad, refreshTrigger }: P
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    try { setNotes(await loadNotes()); }
-    catch { /* ignore — user not authed yet */ }
-    finally { setLoading(false); }
+    try {
+      setNotes(await loadNotes());
+    } catch (err) {
+      // Silently ignore auth errors (not yet signed in); log anything unexpected
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("JWT") && !msg.includes("auth")) {
+        console.error("NoteHistory: failed to load notes", err);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { if (open) refresh(); }, [open, refresh, refreshTrigger]);

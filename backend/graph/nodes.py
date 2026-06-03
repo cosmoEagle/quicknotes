@@ -39,14 +39,25 @@ def make_nodes(llm: BaseChatModel):
         for chunk in chunks:
             prompt = MAP_SUMMARIZE_PROMPT.format(content=chunk)
             response = await llm.ainvoke([HumanMessage(content=prompt)])
-            partial_summaries.append(response.content)
+            raw = response.content
+            if isinstance(raw, list):
+                raw = "".join(
+                    block.get("text", "") if isinstance(block, dict) else str(block)
+                    for block in raw
+                )
+            partial_summaries.append(str(raw))
 
         # Reduce: combine summaries
         combined = "\n\n---\n\n".join(partial_summaries)
         reduce_prompt = REDUCE_PROMPT.format(summaries=combined)
         final = await llm.ainvoke([HumanMessage(content=reduce_prompt)])
-
-        return {"summarized_text": final.content}
+        final_raw = final.content
+        if isinstance(final_raw, list):
+            final_raw = "".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in final_raw
+            )
+        return {"summarized_text": str(final_raw)}
 
     def route_after_assess(state: NoteState) -> str:
         return "map_summarize" if state["needs_chunking"] else "generate_notes_agent"
@@ -97,9 +108,15 @@ def make_nodes(llm: BaseChatModel):
             ]
         })
 
-        # Extract last AI message content
+        # Extract last AI message content, normalizing Gemini list-of-blocks format
         final_message = result["messages"][-1]
-        return {"notes": final_message.content, "cards": []}
+        raw = final_message.content
+        if isinstance(raw, list):
+            raw = "".join(
+                block.get("text", "") if isinstance(block, dict) else str(block)
+                for block in raw
+            )
+        return {"notes": str(raw), "cards": []}
 
     async def format_output(state: NoteState) -> dict:
         # Flashcard runs intentionally leave notes empty (cards live in state["cards"]).

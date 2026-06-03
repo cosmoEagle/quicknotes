@@ -23,7 +23,7 @@ export function useProviderConfig() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        setConfig(JSON.parse(stored));
+        setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(stored) });
       }
     } catch {
       // ignore

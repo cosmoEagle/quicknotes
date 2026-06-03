@@ -4,7 +4,7 @@ from youtube_transcript_api import YouTubeTranscriptApi
 
 def extract_video_id(url: str) -> str:
     patterns = [
-        r"(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})",
+        r"(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/(?:embed|shorts|live)\/)([a-zA-Z0-9_-]{11})",
     ]
     for pattern in patterns:
         match = re.search(pattern, url)

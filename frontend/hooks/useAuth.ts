@@ -10,9 +10,9 @@ export function useAuth() {
   useEffect(() => {
     const supabase = createClient();
 
-    // Hydrate from the stored cookie on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    // Hydrate from server-validated session on mount (getUser() validates the JWT server-side)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user ?? null);
       setLoading(false);
     });
 

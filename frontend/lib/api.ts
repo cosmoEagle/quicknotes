@@ -17,6 +17,38 @@ export interface SSEMessage {
   data: string;
 }
 
+async function* readSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>
+): AsyncGenerator<SSEMessage> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        try {
+          const msg: SSEMessage = JSON.parse(line.slice(6));
+          yield msg;
+        } catch {
+          // malformed line, skip
+        }
+      }
+    }
+  }
+  // Flush any remaining buffer (handles streams that end without a trailing newline)
+  if (buffer.startsWith("data: ")) {
+    try {
+      yield JSON.parse(buffer.slice(6)) as SSEMessage;
+    } catch {
+      // skip
+    }
+  }
+}
+
 export async function* generateNotes(
   request: GenerateRequest,
   signal?: AbortSignal
@@ -38,29 +70,7 @@ export async function* generateNotes(
     yield { event: "error", data: "No response body from server." };
     return;
   }
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        try {
-          const msg: SSEMessage = JSON.parse(line.slice(6));
-          yield msg;
-        } catch {
-          // malformed line, skip
-        }
-      }
-    }
-  }
+  yield* readSSEStream(reader);
 }
 
 export function fileToBase64(file: File): Promise<string> {
@@ -107,27 +117,5 @@ export async function* reviseNotes(
     yield { event: "error", data: "No response body from server." };
     return;
   }
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        try {
-          const msg: SSEMessage = JSON.parse(line.slice(6));
-          yield msg;
-        } catch {
-          // malformed line, skip
-        }
-      }
-    }
-  }
+  yield* readSSEStream(reader);
 }

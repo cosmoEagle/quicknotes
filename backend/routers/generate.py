@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Literal
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -25,11 +25,11 @@ PROVIDER_API_KEY_MAP = {
 
 
 class GenerateRequest(BaseModel):
-    source_type: str       # "youtube" | "pdf" | "article"
-    content: str           # URL for youtube/article, base64 for pdf
-    style: str             # "summary" | "deep-dive" | "flashcard" | "timestamped"
-    description: str = ""
-    provider: str          # "openai" | "anthropic" | "google_genai" | "groq"
+    source_type: Literal["youtube", "pdf", "article"]
+    content: str = Field(max_length=10_000_000)  # ~7.5 MB after base64 decode
+    style: Literal["summary", "deep-dive", "flashcard", "timestamped"]
+    description: str = Field(default="", max_length=5_000)
+    provider: Literal["openai", "anthropic", "google_genai", "groq"]
     model: str             # e.g. "gemini-2.5-flash-lite"
     api_key: str
     proficiency: str = "intermediate"  # flashcard only
@@ -53,15 +53,15 @@ async def run_graph_stream(request: GenerateRequest) -> AsyncGenerator[str, None
 
     try:
         if request.source_type == "youtube":
-            loaded = load_youtube(request.content)
+            loaded = await asyncio.to_thread(load_youtube, request.content)
             content_text = loaded["text"]
             segments = loaded.get("segments", [])
         elif request.source_type == "pdf":
-            loaded = load_pdf(request.content)
+            loaded = await asyncio.to_thread(load_pdf, request.content)
             content_text = loaded["text"]
             segments = []
         elif request.source_type == "article":
-            loaded = load_article(request.content)
+            loaded = await asyncio.to_thread(load_article, request.content)
             content_text = loaded["text"]
             segments = []
         else:
@@ -134,8 +134,8 @@ async def run_graph_stream(request: GenerateRequest) -> AsyncGenerator[str, None
             async for event in graph.astream_events(initial_state, version="v2"):
                 event_type = event.get("event", "")
 
-                # Stream tokens from the LLM inside the agent node
-                if event_type == "on_chat_model_stream":
+                # Stream tokens ONLY from the final agent node, not from map_summarize's inner LLM calls
+                if event_type == "on_chat_model_stream" and event.get("metadata", {}).get("langgraph_node") == "generate_notes_agent":
                     chunk = event["data"].get("chunk")
                     if chunk and hasattr(chunk, "content"):
                         # content may be a plain string or a list of content blocks (Gemini)
