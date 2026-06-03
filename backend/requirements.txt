@@ -9,6 +9,7 @@ langchain-anthropic>=0.3.3
 langchain-groq>=0.2.3
 langchain-community>=0.3.13
 youtube-transcript-api>=1.2.4
+yt-dlp>=2024.1.1
 pypdf>=5.1.0
 httpx>=0.28.0
 beautifulsoup4>=4.12.3
