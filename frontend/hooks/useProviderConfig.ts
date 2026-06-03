@@ -4,26 +4,47 @@ import { useState, useEffect } from "react";
 export interface ProviderConfig {
   provider: string;
   model: string;
-  apiKey: string;
+  apiKey: string; // derived: apiKeys[provider] ?? "" — do not store directly
 }
 
-const DEFAULT_CONFIG: ProviderConfig = {
+// Internal storage shape: one key slot per provider
+interface StoredConfig {
+  provider: string;
+  model: string;
+  apiKeys: Record<string, string>;
+}
+
+const DEFAULTS: StoredConfig = {
   provider: "google_genai",
   model: "gemini-2.5-flash-lite",
-  apiKey: "",
+  apiKeys: {},
 };
 
 const STORAGE_KEY = "qn_provider_config";
 
 export function useProviderConfig() {
-  const [config, setConfig] = useState<ProviderConfig>(DEFAULT_CONFIG);
+  const [stored, setStored] = useState<StoredConfig>(DEFAULTS);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(stored) });
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Migrate old single-key format: { provider, model, apiKey } → new per-provider format
+        if (typeof parsed.apiKey === "string" && !parsed.apiKeys) {
+          const migrated: StoredConfig = {
+            provider: parsed.provider ?? DEFAULTS.provider,
+            model: parsed.model ?? DEFAULTS.model,
+            apiKeys: parsed.apiKey
+              ? { [parsed.provider ?? DEFAULTS.provider]: parsed.apiKey }
+              : {},
+          };
+          setStored(migrated);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+        } else {
+          setStored({ ...DEFAULTS, ...parsed });
+        }
       }
     } catch {
       // ignore
@@ -31,9 +52,22 @@ export function useProviderConfig() {
     setLoaded(true);
   }, []);
 
+  // Computed view: expose apiKey as the current provider's stored key
+  const config: ProviderConfig = {
+    provider: stored.provider,
+    model: stored.model,
+    apiKey: stored.apiKeys[stored.provider] ?? "",
+  };
+
   const updateConfig = (updates: Partial<ProviderConfig>) => {
-    setConfig((prev) => {
-      const next = { ...prev, ...updates };
+    setStored((prev) => {
+      const next: StoredConfig = { ...prev, apiKeys: { ...prev.apiKeys } };
+      if (updates.provider !== undefined) next.provider = updates.provider;
+      if (updates.model !== undefined) next.model = updates.model;
+      if (updates.apiKey !== undefined) {
+        // Store under the (potentially just-updated) provider key
+        next.apiKeys[next.provider] = updates.apiKey;
+      }
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       } catch {
