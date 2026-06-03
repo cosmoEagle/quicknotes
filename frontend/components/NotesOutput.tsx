@@ -1,8 +1,14 @@
 "use client";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import FlashcardViewer, { Card } from "./FlashcardViewer";
+import YouTubePlayer from "./YouTubePlayer";
+
+function extractVideoId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
 
 interface Props {
   notes: string;
@@ -15,14 +21,18 @@ interface Props {
   onToggleEdit: () => void;
   onNotesChange: (s: string) => void;
   onCardEdit: (index: number, field: "question" | "answer", value: string) => void;
+  sourceType: string;
+  videoUrl: string;
 }
 
 export default function NotesOutput({
   notes, status, isStreaming, isError, style, cards,
   isEditing, onToggleEdit, onNotesChange, onCardEdit,
+  sourceType, videoUrl,
 }: Props) {
   const hasContent = notes.length > 0;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [seekTo, setSeekTo] = useState<number | null>(null);
 
   // Auto-scroll to bottom as tokens arrive
   useEffect(() => {
@@ -222,7 +232,50 @@ export default function NotesOutput({
         {/* Done: full markdown rendering */}
         {hasContent && !isError && !isStreaming && !isEditing && (
           <div className="md-output">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{notes}</ReactMarkdown>
+            {/* Embedded YouTube player — only for timestamped YouTube notes */}
+            {style === "timestamped" && sourceType === "youtube" && (() => {
+              const vid = extractVideoId(videoUrl);
+              return vid ? <YouTubePlayer videoId={vid} seekTo={seekTo} /> : null;
+            })()}
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                h2: ({ children }) => {
+                  const text = String(children);
+                  const m = text.match(/^\[(\d{1,2}):(\d{2})\]\s*(.*)$/);
+                  if (m) {
+                    const secs = parseInt(m[1]) * 60 + parseInt(m[2]);
+                    return (
+                      <h2>
+                        <button
+                          onClick={() => setSeekTo(secs)}
+                          title={`Jump to ${m[1]}:${m[2]}`}
+                          style={{
+                            fontFamily: "var(--font-jetbrains)",
+                            fontSize: "0.82rem",
+                            fontWeight: 600,
+                            color: "var(--accent)",
+                            background: "var(--accent-faint)",
+                            border: "1px solid var(--accent-border-dim)",
+                            borderRadius: "5px",
+                            padding: "1px 7px",
+                            cursor: "pointer",
+                            marginRight: "8px",
+                            transition: "all 120ms",
+                          }}
+                        >
+                          {m[1]}:{m[2]}
+                        </button>
+                        {m[3]}
+                      </h2>
+                    );
+                  }
+                  return <h2>{children}</h2>;
+                },
+              }}
+            >
+              {notes}
+            </ReactMarkdown>
           </div>
         )}
       </div>
