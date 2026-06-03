@@ -92,11 +92,13 @@ export default function FloatingYouTubePlayer({ videoId, seekTo, onClose }: Prop
         videoId, height: "100%", width: "100%",
         playerVars: { autoplay: 0, modestbranding: 1, rel: 0, color: "white" },
         events: {
-          onReady: () => {
-            // Apply any seek that arrived before the player finished loading.
+          onReady: (event: any) => {
+            // Re-assign to event.target — the fully-ready player with all API methods.
+            // new YT.Player() returns a placeholder; seekTo/playVideo only exist on event.target.
+            playerRef.current = event.target;
             if (pendingSeek.current !== null) {
-              playerRef.current.seekTo(pendingSeek.current, true);
-              playerRef.current.playVideo();
+              event.target.seekTo(pendingSeek.current, true);
+              event.target.playVideo();
               pendingSeek.current = null;
             }
           },

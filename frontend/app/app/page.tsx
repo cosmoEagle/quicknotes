@@ -1,6 +1,7 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ProviderPanel from "@/components/ProviderPanel";
 import SourceTabs, { SourceType } from "@/components/SourceTabs";
@@ -10,12 +11,22 @@ import NotesOutput from "@/components/NotesOutput";
 import ReviseChat, { ChatTurn } from "@/components/ReviseChat";
 import GenerateButton, { GenerateState } from "@/components/GenerateButton";
 import { useProviderConfig } from "@/hooks/useProviderConfig";
+import { useAuth } from "@/hooks/useAuth";
 import { generateNotes, reviseNotes } from "@/lib/api";
+import { saveNote, extractTitle, type NoteRecord } from "@/lib/notes";
+import NoteHistory from "@/components/NoteHistory";
 
 type Mode = "centered" | "split";
 
 /* ── Topbar ── */
-function Topbar({ mode, onNew }: { mode: Mode; onNew: () => void }) {
+function Topbar({ mode, onNew, userEmail, onSignOut, onHistory }: {
+  mode: Mode; onNew: () => void;
+  userEmail: string; onSignOut: () => void;
+  onHistory: () => void;
+}) {
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const initial = userEmail.charAt(0).toUpperCase();
+
   return (
     <header style={{
       display: "flex",
@@ -46,30 +57,85 @@ function Topbar({ mode, onNew }: { mode: Mode; onNew: () => void }) {
         </Link>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         {mode === "split" && (
           <button
             onClick={onNew}
             style={{
-              padding: "5px 14px",
-              borderRadius: "8px",
-              fontSize: "12px",
-              fontFamily: "var(--font-dm-sans)",
-              cursor: "pointer",
-              border: "1px solid var(--border)",
-              color: "var(--text-secondary)",
-              background: "transparent",
-              transition: "all 150ms",
+              padding: "5px 14px", borderRadius: "8px", fontSize: "12px",
+              fontFamily: "var(--font-dm-sans)", cursor: "pointer",
+              border: "1px solid var(--border)", color: "var(--text-secondary)",
+              background: "transparent", transition: "all 150ms",
             }}
           >
             ← New
           </button>
         )}
         <ProviderPanel />
+
+        {/* History button — visible styling */}
+        <button
+          onClick={onHistory}
+          style={{
+            padding: "5px 12px", borderRadius: "8px", fontSize: "11px",
+            fontFamily: "var(--font-jetbrains)", cursor: "pointer",
+            border: "1px solid var(--border)", color: "var(--text-secondary)",
+            background: "rgba(255,255,255,0.03)", transition: "all 150ms",
+          }}
+        >
+          ⟳ history
+        </button>
+
+        {/* User avatar — compact dropdown */}
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => setUserMenuOpen((v) => !v)}
+            style={{
+              width: "30px", height: "30px", borderRadius: "50%",
+              background: "var(--accent-faint)", border: "1px solid var(--accent-border-dim)",
+              color: "var(--accent)", fontSize: "12px", fontWeight: 700,
+              fontFamily: "var(--font-syne)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all 150ms",
+            }}
+          >
+            {initial}
+          </button>
+          {userMenuOpen && (
+            <>
+              <div onClick={() => setUserMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{
+                position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 50,
+                minWidth: "200px", padding: "8px",
+                background: "rgba(13,13,13,0.97)", borderRadius: "12px",
+                border: "1px solid var(--border)",
+                boxShadow: "0 16px 40px rgba(0,0,0,0.6)",
+              }}>
+                <p style={{ fontSize: "11px", fontFamily: "var(--font-jetbrains)", color: "var(--text-muted)", padding: "6px 10px 10px", borderBottom: "1px solid var(--border)", marginBottom: "6px", wordBreak: "break-all" }}>
+                  {userEmail}
+                </p>
+                <button
+                  onClick={() => { setUserMenuOpen(false); onSignOut(); }}
+                  style={{
+                    width: "100%", textAlign: "left", padding: "8px 10px", borderRadius: "8px",
+                    fontSize: "12px", fontFamily: "var(--font-dm-sans)", cursor: "pointer",
+                    border: "none", color: "var(--text-secondary)", background: "transparent",
+                    transition: "all 120ms",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  Sign out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
 }
+
 
 /* ── Input form fields (shared between centered card and sidebar) ── */
 function InputFields({
@@ -144,7 +210,14 @@ function InputFields({
 }
 
 export default function AppPage() {
+  const { user, loading: authLoading, signOut } = useAuth();
+  const router = useRouter();
   const { config, loaded } = useProviderConfig();
+
+  // Redirect to /auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/auth");
+  }, [user, authLoading, router]);
   const [mode, setMode] = useState<Mode>("centered");
   const [sourceType, setSourceType] = useState<SourceType>("youtube");
   const [content, setContent] = useState("");
@@ -158,6 +231,8 @@ export default function AppPage() {
   const [genState, setGenState] = useState<GenerateState>("idle");
   const [isError, setIsError] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [historyOpen, setHistoryOpen]       = useState(false);
+  const [historySaveTick, setHistorySaveTick] = useState(0); // increment after save to refresh list
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([]);
   const [isRevising, setIsRevising] = useState(false);
   const [reviseStatus, setReviseStatus] = useState("");
@@ -255,6 +330,41 @@ export default function AppPage() {
     setIsRevising(false);
   };
 
+  // Auto-save after generation completes
+  useEffect(() => {
+    if (genState !== "done" || isError || (!notes && !cards.length)) return;
+    const title = extractTitle(notes, cards.length ? cards : null, style, sourceType, content);
+    saveNote({
+      title,
+      style,
+      source_type: sourceType,
+      source_url: sourceType !== "pdf" ? content.trim() : null,
+      content: notes,
+      cards: cards.length ? cards : null,
+    })
+      .then(() => setHistorySaveTick((t) => t + 1))
+      .catch(() => { /* silently ignore save errors */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genState]);
+
+  // Load a note from history
+  const handleLoadNote = (note: NoteRecord) => {
+    abortRef.current?.abort();
+    reviseAbortRef.current?.abort();
+    setMode("split");
+    setStyle(note.style as NoteStyle);
+    setSourceType(note.source_type as SourceType);
+    setContent(note.source_url ?? "");
+    setNotes(note.content);
+    setCards(note.cards ?? []);
+    setGenState("done");
+    setIsError(false);
+    setIsEditing(false);
+    setChatHistory([]);
+    setIsRevising(false);
+    setStatus("");
+  };
+
   const handleToggleEdit = () => setIsEditing((v) => !v);
 
   const handleNotesChange = (s: string) => setNotes(s);
@@ -329,9 +439,18 @@ export default function AppPage() {
     hasKey: loaded && !!config.apiKey,
   };
 
+  // Show nothing while checking auth (avoids flash of app content)
+  if (authLoading || !user) return null;
+
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--bg-base)" }}>
-      <Topbar mode={mode} onNew={handleNew} />
+      <Topbar mode={mode} onNew={handleNew} userEmail={user.email ?? ""} onSignOut={signOut} onHistory={() => setHistoryOpen(true)} />
+      <NoteHistory
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onLoad={handleLoadNote}
+        refreshTrigger={historySaveTick}
+      />
 
       {/* ── Scene container ── */}
       <div style={{ flex: 1, position: "relative", minHeight: 0 }}>

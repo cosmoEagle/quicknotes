@@ -245,20 +245,22 @@ export default function NotesOutput({
           />
         )}
 
+        {/* Floating YouTube popup — rendered outside isEditing gate so the player
+            stays alive (and the video keeps playing) while the user edits the note. */}
+        {style === "timestamped" && sourceType === "youtube" && playerOpen && hasContent && !isError && (() => {
+          const vid = extractVideoId(videoUrl);
+          return vid ? (
+            <FloatingYouTubePlayer
+              videoId={vid}
+              seekTo={seekTo}
+              onClose={() => setPlayerOpen(false)}
+            />
+          ) : null;
+        })()}
+
         {/* Done: full markdown rendering */}
         {hasContent && !isError && !isStreaming && !isEditing && (
           <div className="md-output">
-            {/* Floating YouTube popup */}
-            {style === "timestamped" && sourceType === "youtube" && playerOpen && (() => {
-              const vid = extractVideoId(videoUrl);
-              return vid ? (
-                <FloatingYouTubePlayer
-                  videoId={vid}
-                  seekTo={seekTo}
-                  onClose={() => setPlayerOpen(false)}
-                />
-              ) : null;
-            })()}
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
