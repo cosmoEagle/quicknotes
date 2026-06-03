@@ -499,6 +499,8 @@ export default function AppPage() {
                 onToggleEdit={handleToggleEdit}
                 onNotesChange={handleNotesChange}
                 onCardEdit={handleCardEdit}
+                sourceType={sourceType}
+                videoUrl={content}
               />
             </div>
             {style !== "flashcard" && genState === "done" && !isError && (
