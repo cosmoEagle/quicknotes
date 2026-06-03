@@ -242,14 +242,15 @@ export default function NotesOutput({
               components={{
                 h2: ({ children }) => {
                   const text = String(children);
-                  const m = text.match(/^\[(\d{1,2}):(\d{2})\]\s*(.*)$/);
+                  const m = text.match(/^\[?(\d{1,2}):(\d{2})\]?\s*(.*)$/);
                   if (m) {
                     const secs = parseInt(m[1]) * 60 + parseInt(m[2]);
+                    const ts = `${m[1].padStart(2,"0")}:${m[2]}`;
                     return (
                       <h2>
                         <button
                           onClick={() => setSeekTo(secs)}
-                          title={`Jump to ${m[1]}:${m[2]}`}
+                          title={`Jump to ${ts}`}
                           style={{
                             fontFamily: "var(--font-jetbrains)",
                             fontSize: "0.82rem",
@@ -264,7 +265,7 @@ export default function NotesOutput({
                             transition: "all 120ms",
                           }}
                         >
-                          {m[1]}:{m[2]}
+                          {ts}
                         </button>
                         {m[3]}
                       </h2>
