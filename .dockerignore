@@ -1,0 +1,10 @@
+frontend/
+.git/
+.venv/
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+.brainstorm/
+docs/
+*.md
+Procfile
