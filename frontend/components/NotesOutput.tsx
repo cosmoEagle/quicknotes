@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import FlashcardViewer, { Card } from "./FlashcardViewer";
-import YouTubePlayer from "./YouTubePlayer";
+import FloatingYouTubePlayer, { SeekRequest } from "./FloatingYouTubePlayer";
 
 function extractVideoId(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
@@ -32,7 +32,8 @@ export default function NotesOutput({
 }: Props) {
   const hasContent = notes.length > 0;
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [seekTo, setSeekTo] = useState<number | null>(null);
+  const [seekTo, setSeekTo] = useState<SeekRequest | null>(null);
+  const [playerOpen, setPlayerOpen] = useState(false);
 
   // Auto-scroll to bottom as tokens arrive
   useEffect(() => {
@@ -117,6 +118,21 @@ export default function NotesOutput({
 
         {hasContent && !isStreaming && !isError && (
           <div style={{ display: "flex", gap: "8px" }}>
+            {style === "timestamped" && sourceType === "youtube" && extractVideoId(videoUrl) && (
+              <button
+                onClick={() => setPlayerOpen((v) => !v)}
+                style={{
+                  padding: "5px 14px", borderRadius: "8px", fontSize: "11px",
+                  fontFamily: "var(--font-dm-sans)", cursor: "pointer",
+                  border: playerOpen ? "1px solid var(--accent-border)" : "1px solid var(--border)",
+                  color: playerOpen ? "var(--accent)" : "var(--text-secondary)",
+                  background: playerOpen ? "var(--accent-faint)" : "transparent",
+                  transition: "all 150ms",
+                }}
+              >
+                ▶ video
+              </button>
+            )}
             <button
               onClick={onToggleEdit}
               style={{
@@ -232,10 +248,16 @@ export default function NotesOutput({
         {/* Done: full markdown rendering */}
         {hasContent && !isError && !isStreaming && !isEditing && (
           <div className="md-output">
-            {/* Embedded YouTube player — only for timestamped YouTube notes */}
-            {style === "timestamped" && sourceType === "youtube" && (() => {
+            {/* Floating YouTube popup */}
+            {style === "timestamped" && sourceType === "youtube" && playerOpen && (() => {
               const vid = extractVideoId(videoUrl);
-              return vid ? <YouTubePlayer videoId={vid} seekTo={seekTo} /> : null;
+              return vid ? (
+                <FloatingYouTubePlayer
+                  videoId={vid}
+                  seekTo={seekTo}
+                  onClose={() => setPlayerOpen(false)}
+                />
+              ) : null;
             })()}
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -249,7 +271,10 @@ export default function NotesOutput({
                     return (
                       <h2>
                         <button
-                          onClick={() => setSeekTo(secs)}
+                          onClick={() => {
+                            setSeekTo(prev => ({ secs, id: (prev?.id ?? 0) + 1 }));
+                            setPlayerOpen(true);
+                          }}
                           title={`Jump to ${ts}`}
                           style={{
                             fontFamily: "var(--font-jetbrains)",

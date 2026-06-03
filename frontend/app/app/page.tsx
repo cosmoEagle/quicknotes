@@ -44,17 +44,6 @@ function Topbar({ mode, onNew }: { mode: Mode; onNew: () => void }) {
             QuickNotes
           </span>
         </Link>
-        <span style={{
-          fontSize: "10px",
-          padding: "2px 8px",
-          borderRadius: "4px",
-          fontFamily: "var(--font-jetbrains)",
-          background: "var(--accent-faint)",
-          border: "1px solid var(--accent-border-dim)",
-          color: "var(--accent)",
-        }}>
-          LangGraph
-        </span>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -452,30 +441,6 @@ export default function AppPage() {
               <InputFields {...inputProps} />
             </div>
 
-            {/* Pipeline info pinned to bottom */}
-            <div style={{
-              borderTop: "1px solid var(--border)",
-              padding: "16px 20px",
-              flexShrink: 0,
-            }}>
-              <p className="section-label" style={{ marginBottom: "12px" }}>PIPELINE</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {[
-                  ["01", "Extract",  "Pull content from source"],
-                  ["02", "Assess",   "Chunk long content via map-reduce"],
-                  ["03", "Agent",    "ReAct agent generates notes"],
-                  ["04", "Stream",   "Tokens arrive live"],
-                ].map(([n, t, d]) => (
-                  <div key={n} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                    <span style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains)", fontSize: "10px", flexShrink: 0, marginTop: "1px" }}>{n}</span>
-                    <div>
-                      <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-secondary)", fontFamily: "var(--font-dm-sans)" }}>{t}</span>
-                      <span style={{ fontSize: "11px", marginLeft: "6px", color: "var(--text-muted)" }}>{d}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Right: output */}
