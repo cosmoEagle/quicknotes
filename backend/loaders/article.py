@@ -23,7 +23,7 @@ def load_article(url: str) -> dict:
     validate_url(url)
 
     try:
-        response = httpx.get(url, headers=headers, follow_redirects=False, timeout=15.0)
+        response = httpx.get(url, headers=headers, follow_redirects=True, timeout=15.0)
         response.raise_for_status()
     except httpx.HTTPStatusError as e:
         raise ValueError(f"Could not fetch URL: HTTP {e.response.status_code}")

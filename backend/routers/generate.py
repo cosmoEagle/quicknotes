@@ -164,6 +164,10 @@ async def run_graph_stream(request: GenerateRequest) -> AsyncGenerator[str, None
         yield _sse("error", f"Generation failed: {str(e)}")
         return
 
+    if not notes_started:
+        yield _sse("error", "No notes were generated. The content may be unreadable or the model returned an empty response — try regenerating or using a different model.")
+        return
+
     yield _sse("done", "")
 
 
