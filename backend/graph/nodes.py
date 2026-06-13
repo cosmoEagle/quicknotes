@@ -95,22 +95,12 @@ def make_nodes(llm: BaseChatModel):
 
         system_prompt = build_agent_prompt(state["style"], content, state.get("description", ""))
 
-        from .tools import make_tools
-        from langgraph.prebuilt import create_react_agent
+        response = await llm.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content="Generate the notes now."),
+        ])
 
-        tools = make_tools(content)
-        agent = create_react_agent(model=llm, tools=tools)
-
-        result = await agent.ainvoke({
-            "messages": [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content="Generate the notes now."),
-            ]
-        })
-
-        # Extract last AI message content, normalizing Gemini list-of-blocks format
-        final_message = result["messages"][-1]
-        raw = final_message.content
+        raw = response.content
         if isinstance(raw, list):
             raw = "".join(
                 block.get("text", "") if isinstance(block, dict) else str(block)

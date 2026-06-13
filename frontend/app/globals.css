@@ -158,7 +158,8 @@ body {
 .md-output h2 { font-size: 1rem;    font-weight: 600; margin: 1.1em 0 .4em; color: var(--text-primary);   font-family: var(--font-syne); border-bottom: 1px solid var(--border); padding-bottom: .25em; }
 .md-output h3 { font-size: .88rem;  font-weight: 600; margin: .85em 0 .3em; color: var(--text-secondary); }
 .md-output p  { margin: .45em 0; color: var(--text-primary); }
-.md-output ul, .md-output ol { margin: .4em 0; padding-left: 1.4em; }
+.md-output ul { margin: .4em 0; padding-left: 1.4em; list-style-type: disc; }
+.md-output ol { margin: .4em 0; padding-left: 1.4em; list-style-type: decimal; }
 .md-output li { margin: .25em 0; }
 .md-output strong { color: var(--accent); font-weight: 600; }
 .md-output em     { color: var(--text-secondary); font-style: italic; }
