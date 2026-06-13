@@ -19,7 +19,7 @@ class ReviseRequest(BaseModel):
     notes: str = Field(max_length=500_000)
     instruction: str = Field(max_length=5_000)
     history: list[dict] = []
-    source_type: Literal["youtube", "pdf", "article"]
+    source_type: Literal["youtube", "pdf", "article", "text"]
     content: str
     provider: Literal["openai", "anthropic", "google_genai", "groq"]
     model: str

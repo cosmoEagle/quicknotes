@@ -33,7 +33,7 @@ export default function ReviseChat({ history, isRevising, status, collapsed, onT
   };
 
   return (
-    <div style={{ borderTop: "1px solid var(--border)", background: "rgba(9,9,9,0.55)", flexShrink: 0 }}>
+    <div style={{ borderTop: "1px solid var(--border)", background: "rgba(17,17,17,0.55)", flexShrink: 0 }}>
       {/* Header / toggle */}
       <button
         onClick={onToggleCollapse}

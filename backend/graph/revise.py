@@ -66,6 +66,8 @@ def make_consult_source(source_type: str, content: str):
                 validate_url(content)
                 result = await asyncio.to_thread(load_article, content)
                 cache["text"] = result["text"]
+            elif source_type == "text":
+                cache["text"] = content
             else:
                 cache["text"] = ""
         except Exception:

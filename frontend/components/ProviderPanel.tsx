@@ -167,7 +167,7 @@ export default function ProviderPanel() {
                 rel="noopener noreferrer"
                 style={{ color: "var(--accent)", textDecoration: "underline" }}
               >
-                Get a free key →
+                Get a key →
               </a>
             </p>
 

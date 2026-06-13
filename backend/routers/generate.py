@@ -25,7 +25,7 @@ PROVIDER_API_KEY_MAP = {
 
 
 class GenerateRequest(BaseModel):
-    source_type: Literal["youtube", "pdf", "article"]
+    source_type: Literal["youtube", "pdf", "article", "text"]
     content: str = Field(max_length=10_000_000)  # ~7.5 MB after base64 decode
     style: Literal["summary", "deep-dive", "flashcard", "timestamped"]
     description: str = Field(default="", max_length=5_000)
@@ -63,6 +63,9 @@ async def run_graph_stream(request: GenerateRequest) -> AsyncGenerator[str, None
         elif request.source_type == "article":
             loaded = await asyncio.to_thread(load_article, request.content)
             content_text = loaded["text"]
+            segments = []
+        elif request.source_type == "text":
+            content_text = request.content
             segments = []
         else:
             yield _sse("error", f"Unknown source type: {request.source_type}")
