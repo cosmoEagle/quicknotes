@@ -36,7 +36,7 @@ function Topbar({ mode, onNew, userEmail, onSignOut, onHistory }: {
       height: "52px",
       flexShrink: 0,
       borderBottom: "1px solid var(--border)",
-      background: "rgba(9,9,9,0.88)",
+      background: "rgba(17,17,17,0.88)",
       backdropFilter: "blur(14px)",
       WebkitBackdropFilter: "blur(14px)",
       position: "relative",
@@ -562,7 +562,7 @@ export default function AppPage() {
             flexDirection: "column",
             overflowY: "auto",
             borderRight: "1px solid var(--border)",
-            background: "rgba(9,9,9,0.65)",
+            background: "rgba(17,17,17,0.65)",
           }}>
             <div style={{ padding: "24px 20px", flex: 1 }}>
               <InputFields {...inputProps} />

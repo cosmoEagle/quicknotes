@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-base:        #090909;
-  --color-bg-surface:     #0F0F0F;
-  --color-bg-elevated:    #171717;
-  --color-border:         rgba(255,255,255,0.07);
+  --color-bg-base:        #111111;
+  --color-bg-surface:     #181818;
+  --color-bg-elevated:    #212121;
+  --color-border:         rgba(255,255,255,0.11);
   --color-accent:         #10D9A0;
   --color-text-primary:   #EEEAE3;
-  --color-text-secondary: #7D7870;
-  --color-text-muted:     #383430;
+  --color-text-secondary: #9A928A;
+  --color-text-muted:     #5A5450;
   --color-streaming:      #10D9A0;
 
   --font-display: var(--font-syne);
@@ -19,23 +19,23 @@
 :root {
   --accent:           #10D9A0;
   --accent-dim:       #0CB88A;
-  --accent-xfaint:    rgba(16, 217, 160, 0.04);
-  --accent-faint:     rgba(16, 217, 160, 0.07);
-  --accent-glow:      rgba(16, 217, 160, 0.12);
-  --accent-glow-lg:   rgba(16, 217, 160, 0.22);
-  --accent-border:    rgba(16, 217, 160, 0.28);
-  --accent-border-dim:rgba(16, 217, 160, 0.14);
-  --bg-base:          #090909;
-  --bg-surface:       #0F0F0F;
-  --bg-elevated:      #171717;
-  --border:           rgba(255,255,255,0.07);
+  --accent-xfaint:    rgba(16, 217, 160, 0.05);
+  --accent-faint:     rgba(16, 217, 160, 0.09);
+  --accent-glow:      rgba(16, 217, 160, 0.14);
+  --accent-glow-lg:   rgba(16, 217, 160, 0.24);
+  --accent-border:    rgba(16, 217, 160, 0.32);
+  --accent-border-dim:rgba(16, 217, 160, 0.16);
+  --bg-base:          #111111;
+  --bg-surface:       #181818;
+  --bg-elevated:      #212121;
+  --border:           rgba(255,255,255,0.11);
   --text-primary:     #EEEAE3;
-  --text-secondary:   #7D7870;
-  --text-muted:       #383430;
+  --text-secondary:   #9A928A;
+  --text-muted:       #5A5450;
   --streaming:        #10D9A0;
   --error:            #F87171;
-  --error-glow:       rgba(248,113,113,0.12);
-  --error-border:     rgba(248,113,113,0.25);
+  --error-glow:       rgba(248,113,113,0.14);
+  --error-border:     rgba(248,113,113,0.28);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -79,9 +79,9 @@ body {
 /* ── Backgrounds ── */
 .mesh-bg {
   background:
-    radial-gradient(ellipse 60% 50% at 10% 10%, rgba(16,217,160,0.05) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 35% at 90% 90%, rgba(16,217,160,0.04) 0%, transparent 60%),
-    #090909;
+    radial-gradient(ellipse 60% 50% at 10% 10%, rgba(16,217,160,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 35% at 90% 90%, rgba(16,217,160,0.05) 0%, transparent 60%),
+    #111111;
 }
 .dot-grid {
   background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);

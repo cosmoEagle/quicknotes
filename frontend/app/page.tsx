@@ -126,8 +126,8 @@ const FEATURES = [
   },
   {
     num: "02",
-    title: "LangGraph Pipeline",
-    desc: "Hybrid workflow graph with a ReAct agent node — not a simple prompt wrapper.",
+    title: "Agentic Pipeline",
+    desc: "Multi-step workflow with chunking, summarisation, and note generation — not a simple prompt wrapper.",
   },
   {
     num: "03",
@@ -143,10 +143,10 @@ const FEATURES = [
 
 /* ── Marquee items ── */
 const MARQUEE_ITEMS = [
-  "YouTube", "PDF", "Articles", "Gemini", "OpenAI", "Anthropic", "Groq",
-  "LangGraph", "Streaming", "Obsidian", "Notion", "Markdown",
-  "YouTube", "PDF", "Articles", "Gemini", "OpenAI", "Anthropic", "Groq",
-  "LangGraph", "Streaming", "Obsidian", "Notion", "Markdown",
+  "YouTube", "PDF", "Articles", "Text", "Gemini", "OpenAI", "Anthropic", "Groq",
+  "Streaming", "Flashcards", "Obsidian", "Notion", "Markdown",
+  "YouTube", "PDF", "Articles", "Text", "Gemini", "OpenAI", "Anthropic", "Groq",
+  "Streaming", "Flashcards", "Obsidian", "Notion", "Markdown",
 ];
 
 export default function LandingPage() {
@@ -159,7 +159,7 @@ export default function LandingPage() {
         top: 0,
         zIndex: 50,
         borderBottom: "1px solid var(--border)",
-        background: "rgba(9,9,9,0.82)",
+        background: "rgba(17,17,17,0.82)",
         backdropFilter: "blur(14px)",
         WebkitBackdropFilter: "blur(14px)",
       }}>
@@ -270,7 +270,7 @@ export default function LandingPage() {
                 color: "var(--accent)",
               }}>
                 <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
-                LangGraph · Multi-LLM · Live streaming
+                Multi-LLM · Live streaming · Your key
               </div>
 
               <h1 style={{
@@ -348,7 +348,7 @@ export default function LandingPage() {
                 <span className="pill" style={{ color: "var(--accent)", borderColor: "var(--accent-border-dim)", background: "var(--accent-faint)" }}>
                   4 note styles
                 </span>
-                <span className="pill">free API keys accepted</span>
+                <span className="pill">bring your own API key</span>
               </div>
             </div>
 
@@ -473,7 +473,7 @@ export default function LandingPage() {
             {[
               { step: "01", title: "Provide a source", desc: "YouTube URL, PDF upload, or any article link. The pipeline handles extraction." },
               { step: "02", title: "Pick a style",     desc: "Summary, deep-dive, flashcard Q&A, or timestamped notes — matched to your content." },
-              { step: "03", title: "LangGraph runs",   desc: "Content is extracted, chunked if needed, then a ReAct agent drafts your notes." },
+              { step: "03", title: "AI pipeline runs",  desc: "Content is extracted, chunked if needed, then the model drafts your notes." },
               { step: "04", title: "Stream & export",  desc: "Watch notes appear token by token. Download as .md in one click." },
             ].map((s, i) => (
               <div key={s.step} style={{ position: "relative" }}>
@@ -550,7 +550,7 @@ export default function LandingPage() {
               margin: "0 auto 36px",
               lineHeight: 1.6,
             }}>
-              Bring your free Gemini key and start generating structured notes in under a minute.
+              Bring your API key and start generating structured notes in under a minute.
             </p>
             <Link
               href="/app"
@@ -601,7 +601,7 @@ export default function LandingPage() {
             </span>
           </div>
           <p style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-jetbrains)" }}>
-            LangGraph · LangChain · Next.js · FastAPI
+            LangChain · Next.js · FastAPI
           </p>
         </div>
       </footer>

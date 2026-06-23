@@ -1,7 +1,7 @@
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 export interface GenerateRequest {
-  source_type: "youtube" | "pdf" | "article";
+  source_type: "youtube" | "pdf" | "article" | "text";
   content: string;
   style: string;
   description: string;

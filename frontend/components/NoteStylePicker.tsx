@@ -84,57 +84,63 @@ export default function NoteStylePicker({
         </div>
       </div>
 
-      {style === "flashcard" && (
-        <>
-          <div>
-            <p className="section-label" style={{ marginBottom: "10px" }}>PROFICIENCY</p>
-            <div style={{ display: "flex", gap: "6px" }}>
-              {(["beginner", "intermediate", "expert"] as Proficiency[]).map((p) => {
-                const active = proficiency === p;
-                return (
-                  <button
-                    key={p}
-                    onClick={() => onProficiencyChange(p)}
-                    style={{
-                      flex: 1, padding: "7px 10px", borderRadius: "8px", fontSize: "11px",
-                      textAlign: "center", cursor: "pointer", textTransform: "capitalize",
-                      fontFamily: "var(--font-dm-sans)", fontWeight: active ? 600 : 400,
-                      border: active ? "1px solid var(--accent-border)" : "1px solid var(--border)",
-                      background: active ? "var(--accent-faint)" : "rgba(255,255,255,0.01)",
-                      color: active ? "var(--accent)" : "var(--text-secondary)",
-                      transition: "all 120ms",
-                    }}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-            </div>
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px",
+        overflow: "hidden",
+        maxHeight: style === "flashcard" ? "220px" : "0px",
+        opacity: style === "flashcard" ? 1 : 0,
+        transition: "max-height 300ms cubic-bezier(0.4,0,0.2,1), opacity 220ms ease",
+      }}>
+        <div>
+          <p className="section-label" style={{ marginBottom: "10px" }}>PROFICIENCY</p>
+          <div style={{ display: "flex", gap: "6px" }}>
+            {(["beginner", "intermediate", "expert"] as Proficiency[]).map((p) => {
+              const active = proficiency === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => onProficiencyChange(p)}
+                  style={{
+                    flex: 1, padding: "7px 10px", borderRadius: "8px", fontSize: "11px",
+                    textAlign: "center", cursor: "pointer", textTransform: "capitalize",
+                    fontFamily: "var(--font-dm-sans)", fontWeight: active ? 600 : 400,
+                    border: active ? "1px solid var(--accent-border)" : "1px solid var(--border)",
+                    background: active ? "var(--accent-faint)" : "rgba(255,255,255,0.01)",
+                    color: active ? "var(--accent)" : "var(--text-secondary)",
+                    transition: "all 120ms",
+                  }}
+                >
+                  {p}
+                </button>
+              );
+            })}
           </div>
+        </div>
 
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-              <p className="section-label" style={{ margin: 0 }}>CARD COUNT</p>
-              <span style={{ fontFamily: "var(--font-jetbrains)", fontSize: "13px", fontWeight: 600, color: "var(--accent)" }}>
-                ≈ {cardCount}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={5}
-              max={50}
-              step={1}
-              value={cardCount}
-              onChange={(e) => onCardCountChange(Number(e.target.value))}
-              style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer" }}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "10px", fontFamily: "var(--font-jetbrains)", color: "var(--text-muted)" }}>
-              <span>5</span>
-              <span>50</span>
-            </div>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+            <p className="section-label" style={{ margin: 0 }}>CARD COUNT</p>
+            <span style={{ fontFamily: "var(--font-jetbrains)", fontSize: "13px", fontWeight: 600, color: "var(--accent)" }}>
+              ≈ {cardCount}
+            </span>
           </div>
-        </>
-      )}
+          <input
+            type="range"
+            min={5}
+            max={50}
+            step={1}
+            value={cardCount}
+            onChange={(e) => onCardCountChange(Number(e.target.value))}
+            style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer" }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "10px", fontFamily: "var(--font-jetbrains)", color: "var(--text-muted)" }}>
+            <span>5</span>
+            <span>50</span>
+          </div>
+        </div>
+      </div>
 
       <div>
         <p className="section-label" style={{ marginBottom: "10px" }}>
