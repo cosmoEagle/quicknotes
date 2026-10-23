@@ -37,7 +37,11 @@ def _via_transcript_api(video_id: str) -> list:
 def _via_supadata(video_id: str) -> list:
     api_key = os.getenv("SUPADATA_API_KEY", "")
     if not api_key:
-        raise ValueError("Supadata API key not configured.")
+        raise ValueError(
+            "YouTube transcript extraction failed on this server (cloud IPs are blocked by YouTube). "
+            "Set the SUPADATA_API_KEY environment variable to enable the Supadata fallback. "
+            "Get a key at supadata.ai."
+        )
 
     response = httpx.get(
         "https://api.supadata.ai/v1/youtube/transcript",
