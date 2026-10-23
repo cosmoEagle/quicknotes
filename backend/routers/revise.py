@@ -36,7 +36,7 @@ async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]
         return
 
     consult_source = make_consult_source(request.source_type, request.content)
-    system_prompt = build_revise_prompt(request.notes, request.history)
+    system_prompt = build_revise_prompt(request.notes, request.instruction, request.history)
     agent = create_react_agent(model=llm, tools=[consult_source])
 
     try:

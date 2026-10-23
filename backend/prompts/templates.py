@@ -132,6 +132,8 @@ You have a tool, consult_source, that searches the ORIGINAL source material the 
 {notes}
 ---
 
+Instruction: {instruction}
+
 Output format — follow EXACTLY, with no text before or after:
 <<SUMMARY>>
 A single line describing what you changed.
@@ -139,7 +141,7 @@ A single line describing what you changed.
 The complete revised notes in Markdown (the full document, not a diff)."""
 
 
-def build_revise_prompt(notes: str, history: list[dict]) -> str:
+def build_revise_prompt(notes: str, instruction: str, history: list[dict]) -> str:
     if history:
         rendered = []
         for turn in history:
@@ -153,4 +155,5 @@ def build_revise_prompt(notes: str, history: list[dict]) -> str:
     prompt = REVISE_PROMPT_TEMPLATE
     prompt = prompt.replace("{history_block}", history_block)
     prompt = prompt.replace("{notes}", notes[:60_000])
+    prompt = prompt.replace("{instruction}", instruction)
     return prompt
