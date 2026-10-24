@@ -1,6 +1,8 @@
 "use client";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { fileToBase64 } from "@/lib/api";
+
+const PDF_MAX_BYTES = 4 * 1024 * 1024; // 4 MB
 
 export type SourceType = "youtube" | "pdf" | "article" | "text";
 
@@ -21,6 +23,7 @@ const TAB_IDS = TABS.map((t) => t.id);
 
 export default function SourceTabs({ sourceType, content, onSourceTypeChange, onContentChange }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pdfError, setPdfError] = useState("");
   const isTextMode = sourceType === "text";
   const activeTab = TAB_IDS.includes(sourceType) ? sourceType : "youtube";
 
@@ -42,6 +45,13 @@ export default function SourceTabs({ sourceType, content, onSourceTypeChange, on
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > PDF_MAX_BYTES) {
+      setPdfError(`PDF is ${(file.size / 1024 / 1024).toFixed(1)} MB — max is 4 MB. Compress or split it first.`);
+      onContentChange("");
+      e.target.value = "";
+      return;
+    }
+    setPdfError("");
     try {
       const b64 = await fileToBase64(file);
       onContentChange(b64);
@@ -136,9 +146,15 @@ export default function SourceTabs({ sourceType, content, onSourceTypeChange, on
                   </>
                 )}
               </button>
-              <p style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-jetbrains)" }}>
-                Text-based PDFs only — scanned/image PDFs won&#39;t work
-              </p>
+              {pdfError ? (
+                <p style={{ fontSize: "11px", color: "var(--error)", fontFamily: "var(--font-jetbrains)" }}>
+                  {pdfError}
+                </p>
+              ) : (
+                <p style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-jetbrains)" }}>
+                  Text-based PDFs only · max 4 MB
+                </p>
+              )}
             </div>
           )}
 

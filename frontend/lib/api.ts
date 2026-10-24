@@ -49,16 +49,35 @@ async function* readSSEStream(
   }
 }
 
+function backendUnreachableMsg(): string {
+  const isLocalBackend = BACKEND_URL.includes("localhost") || BACKEND_URL.includes("127.0.0.1");
+  const isDeployedFrontend =
+    typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1";
+  if (isLocalBackend && isDeployedFrontend) {
+    return `Backend URL is still set to ${BACKEND_URL}. Set the NEXT_PUBLIC_BACKEND_URL environment variable to your deployed backend URL and rebuild.`;
+  }
+  return `Cannot reach backend at ${BACKEND_URL}. Is the server running?`;
+}
+
 export async function* generateNotes(
   request: GenerateRequest,
   signal?: AbortSignal
 ): AsyncGenerator<SSEMessage> {
-  const response = await fetch(`${BACKEND_URL}/api/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") throw err;
+    yield { event: "error", data: backendUnreachableMsg() };
+    return;
+  }
 
   if (!response.ok) {
     yield { event: "error", data: `Server error: ${response.status} ${response.statusText}` };
@@ -100,12 +119,19 @@ export async function* reviseNotes(
   request: ReviseRequest,
   signal?: AbortSignal
 ): AsyncGenerator<SSEMessage> {
-  const response = await fetch(`${BACKEND_URL}/api/revise`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}/api/revise`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") throw err;
+    yield { event: "error", data: backendUnreachableMsg() };
+    return;
+  }
 
   if (!response.ok) {
     yield { event: "error", data: `Server error: ${response.status} ${response.statusText}` };
