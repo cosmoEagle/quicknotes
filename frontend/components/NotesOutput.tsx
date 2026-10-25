@@ -6,7 +6,7 @@ import FlashcardViewer, { Card } from "./FlashcardViewer";
 import FloatingYouTubePlayer, { SeekRequest } from "./FloatingYouTubePlayer";
 
 function extractVideoId(url: string): string | null {
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+  const m = url.match(/(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/(?:embed|shorts|live)\/)([a-zA-Z0-9_-]{11})/);
   return m ? m[1] : null;
 }
 
@@ -266,10 +266,12 @@ export default function NotesOutput({
               components={{
                 h2: ({ children }) => {
                   const text = String(children);
-                  const m = text.match(/^\[?(\d{1,2}):(\d{2})\]?\s*(.*)$/);
+                  // [MM:SS], [H:MM:SS] or [MMM:SS]
+                  const m = text.match(/^\[?(?:(\d{1,2}):)?(\d{1,3}):(\d{2})\]?\s*(.*)$/);
                   if (m) {
-                    const secs = parseInt(m[1]) * 60 + parseInt(m[2]);
-                    const ts = `${m[1].padStart(2,"0")}:${m[2]}`;
+                    const [, h, mins, s, rest] = m;
+                    const secs = (h ? parseInt(h) * 3600 : 0) + parseInt(mins) * 60 + parseInt(s);
+                    const ts = h ? `${h}:${mins.padStart(2, "0")}:${s}` : `${mins.padStart(2, "0")}:${s}`;
                     return (
                       <h2>
                         <button
@@ -294,7 +296,7 @@ export default function NotesOutput({
                         >
                           {ts}
                         </button>
-                        {m[3]}
+                        {rest}
                       </h2>
                     );
                   }
