@@ -15,12 +15,17 @@ from ..graph.revise import split_summary_and_notes, make_consult_source
 router = APIRouter()
 
 
+class ChatTurn(BaseModel):
+    role: str = Field(max_length=20)
+    text: str = Field(max_length=20_000)
+
+
 class ReviseRequest(BaseModel):
     notes: str = Field(max_length=500_000)
     instruction: str = Field(max_length=5_000)
-    history: list[dict] = []
+    history: list[ChatTurn] = Field(default=[], max_length=50)
     source_type: Literal["youtube", "pdf", "article", "text"]
-    content: str
+    content: str = Field(max_length=10_000_000)
     provider: Literal["openai", "anthropic", "google_genai", "groq"]
     model: str
     api_key: str
@@ -36,7 +41,7 @@ async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]
         return
 
     consult_source = make_consult_source(request.source_type, request.content)
-    system_prompt = build_revise_prompt(request.notes, request.instruction, request.history)
+    system_prompt = build_revise_prompt(request.notes, request.instruction, [t.model_dump() for t in request.history])
     agent = create_react_agent(model=llm, tools=[consult_source])
 
     try:
