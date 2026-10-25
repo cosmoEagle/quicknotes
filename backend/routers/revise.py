@@ -15,6 +15,14 @@ from ..utils.rate_limit import STREAM_SLOTS, rate_limited, release_when_done
 
 router = APIRouter()
 
+REVISE_NOTES_CAP = 60_000
+TRUNCATED_REASONS = {"length", "max_tokens", "MAX_TOKENS"}
+
+
+def _was_cut_off(message) -> bool:
+    meta = getattr(message, "response_metadata", None) or {}
+    return meta.get("finish_reason") in TRUNCATED_REASONS or meta.get("stop_reason") in TRUNCATED_REASONS
+
 
 class ChatTurn(BaseModel):
     role: str = Field(max_length=20)
@@ -34,6 +42,14 @@ class ReviseRequest(BaseModel):
 
 async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]:
     yield _sse("status", "Revising…")
+
+    if len(request.notes) > REVISE_NOTES_CAP:
+        yield _sse(
+            "error",
+            f"These notes are too long to revise in one pass ({len(request.notes):,} characters; "
+            f"the limit is {REVISE_NOTES_CAP:,}). Edit them manually or regenerate in a shorter style.",
+        )
+        return
 
     try:
         llm = create_llm(request.provider, request.model, request.api_key)
@@ -61,6 +77,13 @@ async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]
         return
 
     final_message = result["messages"][-1]
+    if _was_cut_off(final_message):
+        yield _sse(
+            "error",
+            "The model's reply was cut off before the full notes came back, so your notes were left "
+            "unchanged. Try a model with a larger output limit or ask for a smaller change.",
+        )
+        return
     raw = final_message.content
     if isinstance(raw, list):
         raw = "".join(

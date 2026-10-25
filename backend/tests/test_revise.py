@@ -93,10 +93,9 @@ def test_revise_prompt_no_history_block_when_empty():
     assert "Conversation so far" not in p
 
 
-def test_revise_prompt_caps_long_notes():
-    huge = "x " * 50_000
-    p = build_revise_prompt(huge, "shorten", [])
-    assert len(p) < 70_000
+def test_revise_prompt_keeps_notes_intact():
+    notes = "# Notes\n" + "- point\n" * 7_000
+    assert notes in build_revise_prompt(notes, "shorten", [])
 
 
 def test_revise_prompt_format_roundtrips_with_splitter():
@@ -136,3 +135,52 @@ async def test_consult_source_handles_extraction_failure(monkeypatch):
     tool = revise_mod.make_consult_source("article", "http://example.com")
     out = await tool.ainvoke({"query": "anything"})
     assert "could not be retrieved" in out
+
+
+import json
+
+from fastapi.testclient import TestClient
+from langchain_core.messages import AIMessage
+
+from backend.main import app
+from backend.routers import revise as revise_router
+
+REVISE_BODY = dict(notes="# Notes\n- a", instruction="add b", source_type="text", content="src",
+                   provider="openai", model="m", api_key="k")
+
+
+def _revise_events(monkeypatch, reply=None, **overrides):
+    class FakeAgent:
+        async def ainvoke(self, _):
+            return {"messages": [reply]}
+    monkeypatch.setattr(revise_router, "create_llm", lambda *a: None)
+    monkeypatch.setattr(revise_router, "create_react_agent", lambda **kw: FakeAgent())
+    r = TestClient(app).post("/api/revise", json={**REVISE_BODY, **overrides})
+    return [json.loads(l[6:]) for l in r.text.splitlines() if l.startswith("data: ")]
+
+
+def test_revise_rejects_notes_over_cap_instead_of_truncating(monkeypatch):
+    events = _revise_events(monkeypatch, notes="x" * (revise_router.REVISE_NOTES_CAP + 1))
+    assert events[-1]["event"] == "error"
+    assert "too long" in events[-1]["data"]
+    assert not any(e["event"] == "revised" for e in events)
+
+
+@pytest.mark.parametrize("meta", [
+    {"finish_reason": "length"},       # OpenAI / Groq
+    {"stop_reason": "max_tokens"},     # Anthropic
+    {"finish_reason": "MAX_TOKENS"},   # Gemini
+])
+def test_revise_does_not_apply_cut_off_reply(monkeypatch, meta):
+    reply = AIMessage(content="<<SUMMARY>>\nok\n<<NOTES>>\n# Notes\n- a\n- b (cut", response_metadata=meta)
+    events = _revise_events(monkeypatch, reply)
+    assert events[-1]["event"] == "error" and "cut off" in events[-1]["data"]
+    assert not any(e["event"] == "revised" for e in events)
+
+
+def test_revise_applies_complete_reply(monkeypatch):
+    reply = AIMessage(content="<<SUMMARY>>\nAdded b.\n<<NOTES>>\n# Notes\n- a\n- b",
+                      response_metadata={"finish_reason": "stop"})
+    events = _revise_events(monkeypatch, reply)
+    assert [e["event"] for e in events] == ["status", "summary", "revised", "done"]
+    assert events[2]["data"] == "# Notes\n- a\n- b"

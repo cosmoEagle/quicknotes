@@ -168,6 +168,6 @@ def build_revise_prompt(notes: str, instruction: str, history: list[dict]) -> st
     # that may contain { } characters (e.g. code snippets).
     prompt = REVISE_PROMPT_TEMPLATE
     prompt = prompt.replace("{history_block}", history_block)
-    prompt = prompt.replace("{notes}", notes[:60_000])
+    prompt = prompt.replace("{notes}", notes)
     prompt = prompt.replace("{instruction}", instruction)
     return prompt
