@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import AsyncGenerator, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -13,6 +13,7 @@ from ..loaders.pdf import load_pdf
 from ..loaders.article import load_article
 from ..graph.graph import create_note_graph
 from ..graph.state import NoteState
+from ..utils.rate_limit import STREAM_SLOTS, rate_limited, release_when_done
 
 router = APIRouter()
 
@@ -194,9 +195,10 @@ def _sse(event: str, data: str) -> str:
 
 
 @router.post("/generate")
-async def generate_notes(request: GenerateRequest):
+async def generate_notes(request: GenerateRequest, user_id: str = Depends(rate_limited("generate"))):
+    slot_id = STREAM_SLOTS.acquire(user_id)
     return StreamingResponse(
-        run_graph_stream(request),
+        release_when_done(run_graph_stream(request), user_id, slot_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -1,7 +1,7 @@
 import asyncio
 from typing import AsyncGenerator, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -11,6 +11,7 @@ from langgraph.prebuilt import create_react_agent
 from .generate import create_llm, _sse
 from ..prompts.templates import build_revise_prompt
 from ..graph.revise import split_summary_and_notes, make_consult_source
+from ..utils.rate_limit import STREAM_SLOTS, rate_limited, release_when_done
 
 router = APIRouter()
 
@@ -74,9 +75,10 @@ async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]
 
 
 @router.post("/revise")
-async def revise_notes(request: ReviseRequest):
+async def revise_notes(request: ReviseRequest, user_id: str = Depends(rate_limited("revise"))):
+    slot_id = STREAM_SLOTS.acquire(user_id)
     return StreamingResponse(
-        run_revise_stream(request),
+        release_when_done(run_revise_stream(request), user_id, slot_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
