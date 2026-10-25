@@ -1,7 +1,7 @@
 import asyncio
 from typing import AsyncGenerator, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -11,16 +11,30 @@ from langgraph.prebuilt import create_react_agent
 from .generate import create_llm, _sse
 from ..prompts.templates import build_revise_prompt
 from ..graph.revise import split_summary_and_notes, make_consult_source
+from ..utils.rate_limit import STREAM_SLOTS, rate_limited, release_when_done
 
 router = APIRouter()
+
+REVISE_NOTES_CAP = 60_000
+TRUNCATED_REASONS = {"length", "max_tokens", "MAX_TOKENS"}
+
+
+def _was_cut_off(message) -> bool:
+    meta = getattr(message, "response_metadata", None) or {}
+    return meta.get("finish_reason") in TRUNCATED_REASONS or meta.get("stop_reason") in TRUNCATED_REASONS
+
+
+class ChatTurn(BaseModel):
+    role: str = Field(max_length=20)
+    text: str = Field(max_length=20_000)
 
 
 class ReviseRequest(BaseModel):
     notes: str = Field(max_length=500_000)
     instruction: str = Field(max_length=5_000)
-    history: list[dict] = []
+    history: list[ChatTurn] = Field(default=[], max_length=50)
     source_type: Literal["youtube", "pdf", "article", "text"]
-    content: str
+    content: str = Field(max_length=10_000_000)
     provider: Literal["openai", "anthropic", "google_genai", "groq"]
     model: str
     api_key: str
@@ -29,6 +43,14 @@ class ReviseRequest(BaseModel):
 async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]:
     yield _sse("status", "Revising…")
 
+    if len(request.notes) > REVISE_NOTES_CAP:
+        yield _sse(
+            "error",
+            f"These notes are too long to revise in one pass ({len(request.notes):,} characters; "
+            f"the limit is {REVISE_NOTES_CAP:,}). Edit them manually or regenerate in a shorter style.",
+        )
+        return
+
     try:
         llm = create_llm(request.provider, request.model, request.api_key)
     except Exception as e:
@@ -36,7 +58,7 @@ async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]
         return
 
     consult_source = make_consult_source(request.source_type, request.content)
-    system_prompt = build_revise_prompt(request.notes, request.instruction, request.history)
+    system_prompt = build_revise_prompt(request.notes, request.instruction, [t.model_dump() for t in request.history])
     agent = create_react_agent(model=llm, tools=[consult_source])
 
     try:
@@ -55,6 +77,13 @@ async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]
         return
 
     final_message = result["messages"][-1]
+    if _was_cut_off(final_message):
+        yield _sse(
+            "error",
+            "The model's reply was cut off before the full notes came back, so your notes were left "
+            "unchanged. Try a model with a larger output limit or ask for a smaller change.",
+        )
+        return
     raw = final_message.content
     if isinstance(raw, list):
         raw = "".join(
@@ -69,9 +98,10 @@ async def run_revise_stream(request: ReviseRequest) -> AsyncGenerator[str, None]
 
 
 @router.post("/revise")
-async def revise_notes(request: ReviseRequest):
+async def revise_notes(request: ReviseRequest, user_id: str = Depends(rate_limited("revise"))):
+    slot_id = STREAM_SLOTS.acquire(user_id)
     return StreamingResponse(
-        run_revise_stream(request),
+        release_when_done(run_revise_stream(request), user_id, slot_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

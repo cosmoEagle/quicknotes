@@ -22,7 +22,7 @@ Be thorough. A reader should understand the full content from your notes alone."
     "timestamped": """You are an expert note-taker. Your task is to create timestamped notes organized by the flow of the content.
 
 Format your output as clean Markdown:
-- For each distinct topic/segment, use: `## [MM:SS] Topic Title`
+- For each distinct topic/segment, use: `## [MM:SS] Topic Title` (use `[H:MM:SS]` past the one-hour mark), copying the timestamp from the source
 - Under each timestamp heading: 3-5 bullet points summarizing what was covered in that segment
 - If no timestamps are available, organize by logical sections with `## Part N: Topic Title`
 - End with a `## Full Summary` section
@@ -43,6 +43,20 @@ Section summaries:
 {summaries}
 
 Combined summary:"""
+
+TIMESTAMP_CLAUSE = """
+The content contains [MM:SS] or [H:MM:SS] timestamps. Keep it chronological and start each key point with the timestamp where it occurs, copied exactly from the source.
+"""
+
+
+def build_map_prompt(content: str, timestamped: bool = False) -> str:
+    prompt = MAP_SUMMARIZE_PROMPT.replace("{content}", content)
+    return TIMESTAMP_CLAUSE + prompt if timestamped else prompt
+
+
+def build_reduce_prompt(summaries: str, timestamped: bool = False) -> str:
+    prompt = REDUCE_PROMPT.replace("{summaries}", summaries)
+    return TIMESTAMP_CLAUSE + prompt if timestamped else prompt
 
 AGENT_SYSTEM_TEMPLATE = """{style_prompt}
 
@@ -154,6 +168,6 @@ def build_revise_prompt(notes: str, instruction: str, history: list[dict]) -> st
     # that may contain { } characters (e.g. code snippets).
     prompt = REVISE_PROMPT_TEMPLATE
     prompt = prompt.replace("{history_block}", history_block)
-    prompt = prompt.replace("{notes}", notes[:60_000])
+    prompt = prompt.replace("{notes}", notes)
     prompt = prompt.replace("{instruction}", instruction)
     return prompt

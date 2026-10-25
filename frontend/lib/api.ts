@@ -1,3 +1,5 @@
+import { createClient } from "./supabase";
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 export interface GenerateRequest {
@@ -61,6 +63,27 @@ function backendUnreachableMsg(): string {
   return `Cannot reach backend at ${BACKEND_URL}. Is the server running?`;
 }
 
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await createClient().auth.getSession();
+  return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+}
+
+async function httpErrorMessage(response: Response): Promise<string> {
+  let detail = "";
+  try {
+    const body = await response.json();
+    if (typeof body?.detail === "string") detail = body.detail;
+  } catch {
+    // non-JSON error body
+  }
+  if (response.status === 401) return detail || "Your session has expired — sign in again.";
+  if (response.status === 429) {
+    const wait = response.headers.get("Retry-After");
+    return detail || `Too many requests — try again in ${wait ?? "a few "}s.`;
+  }
+  return detail ? `Server error: ${detail}` : `Server error: ${response.status} ${response.statusText}`;
+}
+
 export async function* generateNotes(
   request: GenerateRequest,
   signal?: AbortSignal
@@ -69,7 +92,7 @@ export async function* generateNotes(
   try {
     response = await fetch(`${BACKEND_URL}/api/generate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(request),
       signal,
     });
@@ -80,7 +103,7 @@ export async function* generateNotes(
   }
 
   if (!response.ok) {
-    yield { event: "error", data: `Server error: ${response.status} ${response.statusText}` };
+    yield { event: "error", data: await httpErrorMessage(response) };
     return;
   }
 
@@ -123,7 +146,7 @@ export async function* reviseNotes(
   try {
     response = await fetch(`${BACKEND_URL}/api/revise`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(request),
       signal,
     });
@@ -134,7 +157,7 @@ export async function* reviseNotes(
   }
 
   if (!response.ok) {
-    yield { event: "error", data: `Server error: ${response.status} ${response.statusText}` };
+    yield { event: "error", data: await httpErrorMessage(response) };
     return;
   }
 

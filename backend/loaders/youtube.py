@@ -1,11 +1,18 @@
 import os
 import re
+from urllib.parse import urlparse
 
 import httpx
 from youtube_transcript_api import YouTubeTranscriptApi
 
 
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"}
+
+
 def extract_video_id(url: str) -> str:
+    host = (urlparse(url.strip()).hostname or "").lower()
+    if host not in YOUTUBE_HOSTS:
+        raise ValueError(f"Not a YouTube URL: {url}")
     patterns = [
         r"(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/(?:embed|shorts|live)\/)([a-zA-Z0-9_-]{11})",
     ]
@@ -77,3 +84,28 @@ def load_youtube(url: str) -> dict:
             continue
 
     raise ValueError(f"Could not fetch transcript: {last_error}")
+
+
+def format_timestamp(seconds: float) -> str:
+    """MM:SS under an hour, H:MM:SS after."""
+    total = int(seconds)
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+
+def format_timestamped(segments: list, window: float = 30.0) -> str:
+    """Render segments as `[MM:SS] text` lines, merged into ~window-second blocks."""
+    lines: list[str] = []
+    block_start = None
+    block_text: list[str] = []
+    for seg in segments:
+        if block_start is None:
+            block_start = seg["start"]
+        elif seg["start"] - block_start >= window:
+            lines.append(f"[{format_timestamp(block_start)}] {' '.join(block_text)}")
+            block_start, block_text = seg["start"], []
+        block_text.append(seg["text"])
+    if block_text:
+        lines.append(f"[{format_timestamp(block_start)}] {' '.join(block_text)}")
+    return "\n".join(lines)
