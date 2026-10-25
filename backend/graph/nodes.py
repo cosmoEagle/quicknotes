@@ -1,11 +1,13 @@
+import asyncio
+
 import tiktoken
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.language_models import BaseChatModel  # type: ignore[import]
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from ..prompts.templates import (
-    MAP_SUMMARIZE_PROMPT,
-    REDUCE_PROMPT,
+    build_map_prompt,
+    build_reduce_prompt,
     build_agent_prompt,
     build_flashcard_prompt,
 )
@@ -13,6 +15,19 @@ from .flashcards import parse_flashcards
 from .state import NoteState
 
 TOKEN_LIMIT = 12_000
+CHUNK_CHARS = 30_000
+MAP_CONCURRENCY = 5
+PROMPT_CHAR_CAP = 60_000
+
+
+def _text_of(response) -> str:
+    raw = response.content
+    if isinstance(raw, list):
+        raw = "".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in raw
+        )
+    return str(raw)
 
 
 def count_tokens(text: str) -> int:
@@ -31,33 +46,23 @@ def make_nodes(llm: BaseChatModel):
         return {"needs_chunking": token_count > TOKEN_LIMIT}
 
     async def map_summarize(state: NoteState) -> dict:
-        splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_CHARS, chunk_overlap=500)
         chunks = splitter.split_text(state["content_text"])
+        timestamped = state["style"] == "timestamped" and bool(state.get("segments"))
+        sem = asyncio.Semaphore(MAP_CONCURRENCY)
 
-        # Map: summarize each chunk
-        partial_summaries = []
-        for chunk in chunks:
-            prompt = MAP_SUMMARIZE_PROMPT.format(content=chunk)
-            response = await llm.ainvoke([HumanMessage(content=prompt)])
-            raw = response.content
-            if isinstance(raw, list):
-                raw = "".join(
-                    block.get("text", "") if isinstance(block, dict) else str(block)
-                    for block in raw
-                )
-            partial_summaries.append(str(raw))
+        async def summarize(chunk: str) -> str:
+            async with sem:
+                prompt = build_map_prompt(chunk, timestamped)
+                return _text_of(await llm.ainvoke([HumanMessage(content=prompt)]))
 
-        # Reduce: combine summaries
+        partial_summaries = await asyncio.gather(*(summarize(c) for c in chunks))
+
         combined = "\n\n---\n\n".join(partial_summaries)
-        reduce_prompt = REDUCE_PROMPT.format(summaries=combined)
-        final = await llm.ainvoke([HumanMessage(content=reduce_prompt)])
-        final_raw = final.content
-        if isinstance(final_raw, list):
-            final_raw = "".join(
-                block.get("text", "") if isinstance(block, dict) else str(block)
-                for block in final_raw
-            )
-        return {"summarized_text": str(final_raw)}
+        if len(combined) <= PROMPT_CHAR_CAP:
+            return {"summarized_text": combined}
+        final = await llm.ainvoke([HumanMessage(content=build_reduce_prompt(combined, timestamped))])
+        return {"summarized_text": _text_of(final)}
 
     def route_after_assess(state: NoteState) -> str:
         return "map_summarize" if state["needs_chunking"] else "generate_notes_agent"
@@ -75,23 +80,8 @@ def make_nodes(llm: BaseChatModel):
                 description=state.get("description", ""),
             )
             response = await llm.ainvoke([HumanMessage(content=prompt)])
-            raw = response.content
-            if isinstance(raw, list):
-                raw = "".join(
-                    block.get("text", "") if isinstance(block, dict) else str(block)
-                    for block in raw
-                )
-            cards = parse_flashcards(str(raw))
+            cards = parse_flashcards(_text_of(response))
             return {"cards": cards, "notes": ""}
-
-        # For timestamped style with YouTube, inject timestamp data
-        if state["style"] == "timestamped" and state.get("segments"):
-            timestamp_lines = []
-            for seg in state["segments"][:500]:  # cap to avoid overload
-                minutes = int(seg["start"]) // 60
-                seconds = int(seg["start"]) % 60
-                timestamp_lines.append(f"[{minutes:02d}:{seconds:02d}] {seg['text']}")
-            content = "\n".join(timestamp_lines)
 
         system_prompt = build_agent_prompt(state["style"], content, state.get("description", ""))
 
@@ -100,13 +90,7 @@ def make_nodes(llm: BaseChatModel):
             HumanMessage(content="Generate the notes now."),
         ])
 
-        raw = response.content
-        if isinstance(raw, list):
-            raw = "".join(
-                block.get("text", "") if isinstance(block, dict) else str(block)
-                for block in raw
-            )
-        return {"notes": str(raw), "cards": []}
+        return {"notes": _text_of(response), "cards": []}
 
     async def format_output(state: NoteState) -> dict:
         # Flashcard runs intentionally leave notes empty (cards live in state["cards"]).

@@ -8,13 +8,17 @@ from pydantic import BaseModel, Field
 
 from langchain.chat_models import init_chat_model
 
-from ..loaders.youtube import load_youtube
+from ..loaders.youtube import format_timestamped, load_youtube
 from ..loaders.pdf import load_pdf
 from ..loaders.article import load_article
 from ..graph.graph import create_note_graph
 from ..graph.state import NoteState
 
 router = APIRouter()
+
+MAX_SOURCE_CHARS = 300_000
+EXTRACT_TIMEOUT = 60
+GENERATE_TIMEOUT = 180
 
 PROVIDER_API_KEY_MAP = {
     "openai": "api_key",
@@ -53,15 +57,15 @@ async def run_graph_stream(request: GenerateRequest) -> AsyncGenerator[str, None
 
     try:
         if request.source_type == "youtube":
-            loaded = await asyncio.to_thread(load_youtube, request.content)
+            loaded = await asyncio.wait_for(asyncio.to_thread(load_youtube, request.content), EXTRACT_TIMEOUT)
             content_text = loaded["text"]
             segments = loaded.get("segments", [])
         elif request.source_type == "pdf":
-            loaded = await asyncio.to_thread(load_pdf, request.content)
+            loaded = await asyncio.wait_for(asyncio.to_thread(load_pdf, request.content), EXTRACT_TIMEOUT)
             content_text = loaded["text"]
             segments = []
         elif request.source_type == "article":
-            loaded = await asyncio.to_thread(load_article, request.content)
+            loaded = await asyncio.wait_for(asyncio.to_thread(load_article, request.content), EXTRACT_TIMEOUT)
             content_text = loaded["text"]
             segments = []
         elif request.source_type == "text":
@@ -70,6 +74,9 @@ async def run_graph_stream(request: GenerateRequest) -> AsyncGenerator[str, None
         else:
             yield _sse("error", f"Unknown source type: {request.source_type}")
             return
+    except TimeoutError:
+        yield _sse("error", "Content extraction timed out. The source may be too large or slow to respond.")
+        return
     except Exception as e:
         yield _sse("error", f"Content extraction failed: {str(e)}")
         return
@@ -77,6 +84,13 @@ async def run_graph_stream(request: GenerateRequest) -> AsyncGenerator[str, None
     if not content_text.strip():
         yield _sse("error", "No readable content found in the provided source.")
         return
+
+    if request.style == "timestamped" and segments:
+        content_text = format_timestamped(segments)
+
+    if len(content_text) > MAX_SOURCE_CHARS:
+        content_text = content_text[:MAX_SOURCE_CHARS]
+        yield _sse("status", f"Source is very long — using the first {MAX_SOURCE_CHARS:,} characters.")
 
     yield _sse("status", "Building note graph…")
 
@@ -112,7 +126,7 @@ async def run_graph_stream(request: GenerateRequest) -> AsyncGenerator[str, None
     # ── Flashcard style: run to completion, then emit one card per event ──
     if request.style == "flashcard":
         try:
-            async with asyncio.timeout(120):
+            async with asyncio.timeout(GENERATE_TIMEOUT):
                 final_state = await graph.ainvoke(initial_state)
         except TimeoutError:
             yield _sse("error", "Generation timed out. The API may be rate-limited — try again in a moment.")
@@ -133,7 +147,7 @@ async def run_graph_stream(request: GenerateRequest) -> AsyncGenerator[str, None
 
     # ── All other styles: token-stream the markdown ──
     try:
-        async with asyncio.timeout(120):
+        async with asyncio.timeout(GENERATE_TIMEOUT):
             async for event in graph.astream_events(initial_state, version="v2"):
                 event_type = event.get("event", "")
 
